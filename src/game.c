@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 
+
 // ========== SETUP ===========================================================
 // ========== MENU ============================================================
 typedef struct Menu {
@@ -22,38 +23,40 @@ typedef struct Menu {
     Color copyrightColor;
 } Menu;
 
+
 // MENU INITIALIZATION
 void menuConstructor(struct Menu* menu) {
     menu->title = "UFO Hunt";
-    menu->titlePosX = 500;
-    menu->titlePosY = 100;
-    menu->titleSize = 50;
+    menu->titlePosX = 175;
+    menu->titlePosY = 25;
+    menu->titleSize = 200;
     menu->titleColor = WHITE;
     
     menu->play = "PLAY";
-    menu->playPosX = 500;
-    menu->playPosY = 200;
-    menu->playSize = 25;
+    menu->playPosX = 550;
+    menu->playPosY = 400;
+    menu->playSize = 50;
     menu->playColor = WHITE;
     
     menu->exit = "EXIT";
-    menu->exitPosX = 500;
-    menu->exitPosY = 225;
-    menu->exitSize = 25;
+    menu->exitPosX = 550;
+    menu->exitPosY = 500;
+    menu->exitSize = 50;
     menu->exitColor = WHITE;
     
     menu->topScore = "TOP SCORE:";
-    menu->topScorePosX = 500;
-    menu->topScorePosY = 275;
+    menu->topScorePosX = 475;
+    menu->topScorePosY = 600;
     menu->topScoreSize = 25;
     menu->topScoreColor = WHITE;
     
     menu->copyright= "@2024 MADE BY MIKNSJ.";
-    menu->copyrightPosX = 500;
-    menu->copyrightPosY = 300;
+    menu->copyrightPosX = 475;
+    menu->copyrightPosY = 650;
     menu->copyrightSize = 25;
     menu->copyrightColor = WHITE;
 }
+
 
 // MENU FUNCTIONS
 // draws the menu
@@ -70,14 +73,15 @@ void DrawMenu(struct Menu* menu) {
             menu->copyrightSize, menu->copyrightColor);
 }
 
+
 // highlights the menu options
-void eventMenuHighlight(struct Menu* menu, int menuKey) {
-    switch (menuKey) {
-        case 0:
+void eventMenuHighlight(struct Menu* menu, unsigned int* menuKey) {
+    switch (*menuKey) {
+        case 1:
             menu->playColor = RED;
             menu->exitColor = WHITE;
             break;
-        case 1:
+        case 2:
             menu->exitColor = RED;
             menu->playColor = WHITE;
             break;
@@ -85,7 +89,47 @@ void eventMenuHighlight(struct Menu* menu, int menuKey) {
             break;
     }
 }
+
+
+// navigates the menu options
+void eventMenuScroll(unsigned int* status, unsigned int* menuKey,
+        int inputKey) { 
+    if (inputKey == KEY_W || inputKey == KEY_UP) {
+        if (*menuKey == 1) {
+            *menuKey = 2;
+        } else {
+            *menuKey = 1;
+        }
+    }
+    if (inputKey == KEY_S || inputKey == KEY_DOWN) {
+        if (*menuKey == 1) {
+            *menuKey = 2;
+        } else {
+            *menuKey = 1;
+        }
+    }
+    
+    if (*menuKey == 2 && (inputKey == KEY_ENTER)) {
+        *status = 1;
+    }
+
+    if (*menuKey == 1 && (inputKey == KEY_ENTER)) {
+        *status = 2;
+    }
+}
 // ========== END OF MENU =====================================================
+
+
+
+// ========== GAME ============================================================
+// ========== GAME FUNCTIONS ==================================================
+// selects the game options
+void eventGameOptions(unsigned int* status, int inputKey) {
+    if (inputKey == KEY_M) {
+        *status = 0;
+    }
+}
+// ========= END OF GAME ======================================================
 
 // ========== END OF SETUP ====================================================
 
@@ -105,9 +149,10 @@ int main(void)
     menuConstructor(menu);
 
     unsigned int status = 0;
-    int menuKey = -1;
-
+    unsigned int menuKey = 0;
     // =========== END OF SETUP ===============================================
+
+
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
@@ -124,40 +169,23 @@ int main(void)
             ClearBackground(BLACK);
 
             if (status == 0) {
-                if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP)) {
-                    if (menuKey == 0) {
-                        menuKey = 1;
-                    } else {
-                        menuKey = 0;
-                    }
-                }
-
-                if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN)) {
-                    if (menuKey == 0) {
-                        menuKey = 1;
-                    } else {
-                        menuKey = 0;
-                    }
-                }
-
-                if (menuKey == 0 && IsKeyPressed(KEY_ENTER)) {
-                    status = 1;
-                }
-
-                if (menuKey == 1 && IsKeyPressed(KEY_ENTER)) {
-                    break;
-                }
-
-                eventMenuHighlight(menu, menuKey);
+                ClearBackground(BLACK);
+                eventMenuScroll(&status, &menuKey, GetKeyPressed());
+                eventMenuHighlight(menu, &menuKey);
                 DrawMenu(menu);
+            } else if (status == 1) {
+                break;
             } else {
-                DrawText("To the game", 100, 100, 50, WHITE);
-                //draw game
+                ClearBackground(RAYWHITE);
+                eventGameOptions(&status, GetKeyPressed());
+                DrawText("To the game", 100, 100, 50, BLACK);
             }
 
         EndDrawing();
         //---------------------------------------------------------------------
     }
+
+
 
     // De-Initialization
     //-------------------------------------------------------------------------
