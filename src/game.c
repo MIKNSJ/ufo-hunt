@@ -131,12 +131,102 @@ void eventGameOptions(unsigned int* status, int inputKey) {
 }
 // ========= END OF GAME ======================================================
 
+
+
+// ========= HUD ==============================================================
+typedef struct HUD {
+    char* border;
+    char* round;
+    char* ammo;
+    char* hit;
+    char* score;
+
+    int borderPosX, borderPosY, borderSize,
+    roundPosX, roundPosY, roundSize,
+    ammoPosX, ammoPosY, ammoSize,
+    hitPosX, hitPosY, hitSize,
+    scorePosX, scorePosY, scoreSize;
+
+    Color borderColor;
+    Color roundColor;
+    Color ammoColor;
+    Color hitColor;
+    Color scoreColor;
+} HUD; 
+
+
+// HUD Initialization
+void hudConstructor(struct HUD* hud) {
+    hud->border = "===================================================";
+    hud->borderPosX = 5;
+    hud->borderPosY = 525;
+    hud->borderSize = 50;
+    hud->borderColor = RAYWHITE;
+
+    hud->round = "R = 1";
+    hud->roundPosX = 100;
+    hud->roundPosY = 600;
+    hud->roundSize = 30;
+    hud->roundColor = RAYWHITE;
+
+    hud->ammo = "[*][*][*]\nSHOT";
+    hud->ammoPosX = 275;
+    hud->ammoPosY = 600;
+    hud->ammoSize = 30;
+    hud->ammoColor = RAYWHITE;
+
+    hud->hit = "HIT   [  ][  ][  ][  ][  ][  ][  ][  ][  ][  ][  ]";
+    hud->hitPosX = 475;
+    hud->hitPosY = 600;
+    hud->hitSize = 30;
+    hud->hitColor = RAYWHITE;
+
+    hud->score = "000000\nSCORE";
+    hud->scorePosX = 1100;
+    hud->scorePosY = 600;
+    hud->scoreSize = 30;
+    hud->scoreColor = RAYWHITE;
+}
+
+// HUD Functions
+// displays the game hud
+void DrawHud(struct HUD* hud) {
+    DrawText(hud->border, hud->borderPosX, hud->borderPosY, hud->borderSize,
+            hud->roundColor);
+    DrawText(hud->round, hud->roundPosX, hud->roundPosY, hud->roundSize,
+            hud->roundColor);
+    DrawText(hud->ammo, hud->ammoPosX, hud->ammoPosY, hud->ammoSize,
+            hud->ammoColor);
+    DrawText(hud->hit, hud->hitPosX, hud->hitPosY, hud->hitSize,
+            hud->hitColor);
+    DrawText(hud->score, hud->scorePosX, hud->scorePosY, hud->scoreSize,
+            hud->scoreColor);
+}
+// ========== END OF HUD ======================================================
+
+
+
+// ========== SPRITE ==========================================================
+typedef struct Saucer {
+    Texture2D sprite;
+    int spritePosX, spritePosY;
+    Color spriteColor;
+} Saucer;
+
+
+// Sprite Initialization
+void constructSprite(struct Saucer* saucer) {
+    saucer->sprite = LoadTexture("../assets/saucer.png");
+    saucer->spritePosX = 100;
+    saucer->spritePosY = 100;
+    saucer->spriteColor = WHITE;
+}
+// ========== END OF SPRITE ===================================================
 // ========== END OF SETUP ====================================================
 
 
 
-int main(void)
-{
+int main(void) {
     // ========== SETUP =======================================================
     // Window (Declaration and intialization)
     const int screenWidth = 1280;
@@ -145,8 +235,12 @@ int main(void)
     SetWindowTitle("UFO Hunt");
 
     // Initialization
-    Menu *menu = (Menu*)malloc(sizeof(Menu));
+    Menu* menu = (Menu*)malloc(sizeof(Menu));
     menuConstructor(menu);
+    HUD* hud = (HUD*)malloc(sizeof(HUD));
+    hudConstructor(hud);
+    Saucer* saucer = (Saucer*)malloc(sizeof(Saucer));
+    constructSprite(saucer);
 
     unsigned int status = 0;
     unsigned int menuKey = 0;
@@ -155,8 +249,7 @@ int main(void)
 
 
     // Main game loop
-    while (!WindowShouldClose())    // Detect window close button or ESC key
-    {
+    while (!WindowShouldClose()) {    // Detect window close button or ESC key
         // Update
         //---------------------------------------------------------------------
         // TODO: Update variables inside here.
@@ -166,8 +259,6 @@ int main(void)
         //---------------------------------------------------------------------
         BeginDrawing();
 
-            ClearBackground(BLACK);
-
             if (status == 0) {
                 ClearBackground(BLACK);
                 eventMenuScroll(&status, &menuKey, GetKeyPressed());
@@ -176,9 +267,11 @@ int main(void)
             } else if (status == 1) {
                 break;
             } else {
-                ClearBackground(RAYWHITE);
+                ClearBackground(BLACK);
                 eventGameOptions(&status, GetKeyPressed());
-                DrawText("To the game", 100, 100, 50, BLACK);
+                DrawHud(hud);
+                DrawTexture(saucer->sprite, saucer->spritePosX,
+                        saucer->spritePosY, saucer->spriteColor);
             }
 
         EndDrawing();
@@ -193,5 +286,6 @@ int main(void)
     //-------------------------------------------------------------------------
 
     free(menu);
+    free(hud);
     return 0;
 }
