@@ -1,5 +1,15 @@
 #include "raylib.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <time.h>
+
+#define SCREEN_WIDTH 1280
+#define SCREEN_HEIGHT 720
+#define SAUCER_WIDTH 512
+#define SAUCER_HEIGHT 512
+#define WINDOW_TITLE "UFO Hunt"
+#define FPS_CAP 60
 
 
 
@@ -209,19 +219,94 @@ void DrawHud(struct HUD* hud) {
 // ========== SPRITE ==========================================================
 typedef struct Saucer {
     Texture2D sprite;
-    int spritePosX, spritePosY;
+    int spritePosX, spritePosY, spriteSpeedModifier;
+    Rectangle hitbox;
+    Rectangle source;
+    Rectangle destination;
+    Vector2 origin;
+    float rotation;
     Color spriteColor;
 } Saucer;
 
 
 // Sprite Initialization
-void constructSprite(struct Saucer* saucer) {
+void spriteConstructor(struct Saucer* saucer) {
     saucer->sprite = LoadTexture("../assets/saucer.png");
-    saucer->spritePosX = 100;
-    saucer->spritePosY = 100;
+    saucer->sprite.width = 75;
+    saucer->sprite.height = 75;
+    saucer->spriteSpeedModifier = 1;
+    saucer->hitbox = (Rectangle){0, 0, 75, 75};
+    
+    // DrawTexture
+    saucer->spritePosX = rand() % 1280;
+    saucer->spritePosY = rand() % 460;
+
+    // DrawTexturePro
+    saucer->source = (Rectangle){0, 0, SAUCER_WIDTH, SAUCER_HEIGHT};
+    saucer->destination = (Rectangle){0, 0, 75, 75};
+    saucer->origin = (Vector2){0, 0};
+    saucer->rotation = 0;
     saucer->spriteColor = WHITE;
 }
+
+
+// Sprite Functions
+// Sprite Movement
+void move(struct Saucer* saucer, float offSetX, float offSetY) {
+    saucer->spritePosX = saucer->spritePosX + offSetX;
+    saucer->spritePosY = saucer->spritePosY + offSetY;
+}
+
+// Sprite Boundaries
+void checkSpriteBoundaries(struct Saucer* saucer) {
+    if (saucer->spritePosX < 0) {
+        saucer->spritePosX = 0;
+    }
+
+    if (saucer->spritePosX > 1200) {
+        saucer->spritePosX = 1200;
+    }
+
+    if (saucer->spritePosY < 0) {
+        saucer->spritePosY = 0;
+    }
+
+    if (saucer->spritePosY > 460) {
+        saucer->spritePosY = 460;
+    }
+}
+
+// Sprite Hitbox
+void updateSpriteHitbox(struct Saucer* saucer) {
+    saucer->hitbox.x = (saucer->spritePosX);
+    saucer->hitbox.y = (saucer->spritePosY);
+}
 // ========== END OF SPRITE ===================================================
+
+
+
+// ========== CROSSHAIR =======================================================
+typedef struct Crosshair {
+    Rectangle recticle;
+    Color reticleColor;
+} Crosshair;
+
+
+// Crosshair Initialization
+void crosshairConstructor(struct Crosshair* crosshair) {
+    crosshair->recticle = (Rectangle){0, 0, 1, 1};
+    crosshair->reticleColor = BLANK;
+}
+
+
+// Crosshair Functions
+// Update Crosshair position
+void updateCrosshairPosition(struct Crosshair* crosshair) {
+    crosshair->recticle.x = GetMousePosition().x;
+    crosshair->recticle.y = GetMousePosition().y;
+}
+// ========== END OF CROSSHAIR ================================================
+
 // ========== END OF SETUP ====================================================
 
 
@@ -229,10 +314,9 @@ void constructSprite(struct Saucer* saucer) {
 int main(void) {
     // ========== SETUP =======================================================
     // Window (Declaration and intialization)
-    const int screenWidth = 1280;
-    const int screenHeight = 720;
-    InitWindow(screenWidth, screenHeight, "resolution");
-    SetWindowTitle("UFO Hunt");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE);
+    SetTargetFPS(FPS_CAP);
+    srand(time(NULL));
 
     // Initialization
     Menu* menu = (Menu*)malloc(sizeof(Menu));
@@ -240,10 +324,13 @@ int main(void) {
     HUD* hud = (HUD*)malloc(sizeof(HUD));
     hudConstructor(hud);
     Saucer* saucer = (Saucer*)malloc(sizeof(Saucer));
-    constructSprite(saucer);
+    spriteConstructor(saucer);
+    Crosshair* crosshair = (Crosshair*)malloc(sizeof(Crosshair));
+    crosshairConstructor(crosshair);
 
     unsigned int status = 0;
     unsigned int menuKey = 0;
+    unsigned int shotDown = 0;
     // =========== END OF SETUP ===============================================
 
 
@@ -252,7 +339,15 @@ int main(void) {
     while (!WindowShouldClose()) {    // Detect window close button or ESC key
         // Update
         //---------------------------------------------------------------------
-        // TODO: Update variables inside here.
+        saucer->hitbox.x = (saucer->spritePosX);
+        saucer->hitbox.y = (saucer->spritePosY);
+        updateSpriteHitbox(saucer);
+        updateCrosshairPosition(crosshair);
+        checkSpriteBoundaries(saucer);
+
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionRecs(saucer->hitbox, crosshair->recticle)) {
+            shotDown = 1;
+        }
         //---------------------------------------------------------------------
 
         // Draw
@@ -270,8 +365,14 @@ int main(void) {
                 ClearBackground(BLACK);
                 eventGameOptions(&status, GetKeyPressed());
                 DrawHud(hud);
-                DrawTexture(saucer->sprite, saucer->spritePosX,
-                        saucer->spritePosY, saucer->spriteColor);
+                if (shotDown != 1) {
+                    DrawRectangleRec(saucer->hitbox, WHITE);
+                    DrawTexture(saucer->sprite, saucer->spritePosX,
+                            saucer->spritePosY, saucer->spriteColor);
+                }
+                move(saucer, saucer->spriteSpeedModifier,
+                        saucer->spriteSpeedModifier);
+                DrawRectangleRec(crosshair->recticle, crosshair->reticleColor);
             }
 
         EndDrawing();
@@ -287,5 +388,7 @@ int main(void) {
 
     free(menu);
     free(hud);
+    free(saucer);
+    free(crosshair);
     return 0;
 }
