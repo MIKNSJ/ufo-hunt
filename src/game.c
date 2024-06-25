@@ -337,7 +337,7 @@ typedef struct Timer {
     float spawnDelay;
     float xMovementDelay;
     float yMovementDelay;
-    float spawnTime;
+    float despawnDelay;
     float roundDelay;
     double currentTime;
 } Timer;
@@ -345,10 +345,10 @@ typedef struct Timer {
 
 // Timer Initialization
 void timerConstructor(struct Timer* timer) {
-    timer->spawnDelay = 5.0;
+    timer->spawnDelay = 3.0;
     timer->xMovementDelay = 1.0;
     timer->yMovementDelay = 1.0;
-    timer->spawnTime = 5;
+    timer->despawnDelay = 10.0;
     timer->roundDelay = 5;
     timer->currentTime = 0;
 }
@@ -356,16 +356,31 @@ void timerConstructor(struct Timer* timer) {
 
 // Timer Functions
 // start spawnDelay timer
-void spawnDelayTimer(struct Timer* timer) {
+void startSpawnDelay(struct Timer* timer) {
     if (timer->spawnDelay >= 0) {
         timer->spawnDelay-=timer->currentTime;
     }
 }
 
-// reset spawnDelay timer
-void resetSpawnDelayTimer(struct Timer* timer) {
+// restart spawnDelay timer
+void restartSpawnDelay(struct Timer* timer) {
     if (timer->spawnDelay <= 0) {
-        timer->spawnDelay = 5.0;
+        timer->spawnDelay = 3.0;
+    }
+}
+
+
+// start despawnTime timer
+void startDespawnDelay(struct Timer* timer) {
+    if (timer->despawnDelay >= 0) {
+        timer->despawnDelay-=timer->currentTime;
+    }
+}
+
+// restart despawnTime timer
+void restartDespawnDelay(struct Timer* timer) {
+    if (timer->despawnDelay <= 0) {
+        timer->despawnDelay = 10.0;
     }
 }
 // ========== END OF TIMER ====================================================
@@ -408,6 +423,7 @@ int main(void) {
         }
         //---------------------------------------------------------------------
 
+        printf("%f", timer->currentTime);
         // Draw
         //---------------------------------------------------------------------
         BeginDrawing();
@@ -423,7 +439,8 @@ int main(void) {
                 ClearBackground(BLACK);
                 eventGameOptions(game, GetKeyPressed());
                 DrawHud(hud);
-                spawnDelayTimer(timer);
+                startSpawnDelay(timer);
+                startDespawnDelay(timer);
                 timer->currentTime = GetFrameTime();
                 
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
@@ -441,6 +458,13 @@ int main(void) {
                     move(saucer, saucer->spriteSpeedModifier,
                             saucer->spriteSpeedModifier);
                 }
+
+                if (crosshair->clickedUFO || timer->despawnDelay <= 0) {
+                    restartSpawnDelay(timer);
+                    restartDespawnDelay(timer);
+                    crosshair->clickedUFO = false;
+                }
+
                 updateCrosshairPosition(crosshair);
                 DrawRectangleRec(crosshair->recticle, crosshair->reticleColor);
             }
