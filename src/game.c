@@ -14,6 +14,33 @@
 
 
 // ========== SETUP ===========================================================
+// ========== GAME ============================================================
+typedef struct Game {
+    unsigned int round;
+    unsigned int targetAmount;
+    unsigned int status;
+} Game;
+
+
+// Game Initialization
+void gameConstructor(struct Game* game) {
+    game->round = 0;
+    game->targetAmount = 10;
+    game->status = 0;
+}
+
+
+// GAME FUNCTIONS
+// selects the game options
+void eventGameOptions(struct Game* game, int inputKey) {
+    if (inputKey == KEY_M) {
+        game->status = 0;
+    }
+}
+// ========= END OF GAME ======================================================
+
+
+
 // ========== MENU ============================================================
 typedef struct Menu {
     const char* title;
@@ -31,6 +58,7 @@ typedef struct Menu {
     Color exitColor;
     Color topScoreColor;
     Color copyrightColor;
+    unsigned int key;
 } Menu;
 
 
@@ -65,6 +93,8 @@ void menuConstructor(struct Menu* menu) {
     menu->copyrightPosY = 650;
     menu->copyrightSize = 25;
     menu->copyrightColor = WHITE;
+
+    menu->key = 0;
 }
 
 
@@ -85,8 +115,9 @@ void DrawMenu(struct Menu* menu) {
 
 
 // highlights the menu options
-void eventMenuHighlight(struct Menu* menu, unsigned int* menuKey) {
-    switch (*menuKey) {
+void eventMenuHighlight(struct Menu* menu) {
+    unsigned int key = menu->key;
+    switch (key) {
         case 1:
             menu->playColor = RED;
             menu->exitColor = WHITE;
@@ -102,44 +133,31 @@ void eventMenuHighlight(struct Menu* menu, unsigned int* menuKey) {
 
 
 // navigates the menu options
-void eventMenuScroll(unsigned int* status, unsigned int* menuKey,
-        int inputKey) { 
+void eventMenuScroll(struct Game* game, struct Menu* menu, int inputKey) { 
     if (inputKey == KEY_W || inputKey == KEY_UP) {
-        if (*menuKey == 1) {
-            *menuKey = 2;
+        if (menu->key == 1) {
+            menu->key = 2;
         } else {
-            *menuKey = 1;
+            menu->key = 1;
         }
     }
     if (inputKey == KEY_S || inputKey == KEY_DOWN) {
-        if (*menuKey == 1) {
-            *menuKey = 2;
+        if (menu->key == 1) {
+            menu->key = 2;
         } else {
-            *menuKey = 1;
+            menu->key = 1;
         }
     }
     
-    if (*menuKey == 2 && (inputKey == KEY_ENTER)) {
-        *status = 1;
+    if (menu->key == 2 && (inputKey == KEY_ENTER)) {
+        game->status = 1;
     }
 
-    if (*menuKey == 1 && (inputKey == KEY_ENTER)) {
-        *status = 2;
+    if (menu->key == 1 && (inputKey == KEY_ENTER)) {
+        game->status = 2;
     }
 }
 // ========== END OF MENU =====================================================
-
-
-
-// ========== GAME ============================================================
-// ========== GAME FUNCTIONS ==================================================
-// selects the game options
-void eventGameOptions(unsigned int* status, int inputKey) {
-    if (inputKey == KEY_M) {
-        *status = 0;
-    }
-}
-// ========= END OF GAME ======================================================
 
 
 
@@ -198,6 +216,7 @@ void hudConstructor(struct HUD* hud) {
     hud->scoreColor = RAYWHITE;
 }
 
+
 // HUD Functions
 // displays the game hud
 void DrawHud(struct HUD* hud) {
@@ -239,7 +258,7 @@ void spriteConstructor(struct Saucer* saucer) {
     
     // DrawTexture
     saucer->spritePosX = rand() % 1280;
-    saucer->spritePosY = rand() % 460;
+    saucer->spritePosY = 460;
 
     // DrawTexturePro
     saucer->source = (Rectangle){0, 0, SAUCER_WIDTH, SAUCER_HEIGHT};
@@ -256,6 +275,7 @@ void move(struct Saucer* saucer, float offSetX, float offSetY) {
     saucer->spritePosX = saucer->spritePosX + offSetX;
     saucer->spritePosY = saucer->spritePosY + offSetY;
 }
+
 
 // Sprite Boundaries
 void checkSpriteBoundaries(struct Saucer* saucer) {
@@ -276,6 +296,7 @@ void checkSpriteBoundaries(struct Saucer* saucer) {
     }
 }
 
+
 // Sprite Hitbox
 void updateSpriteHitbox(struct Saucer* saucer) {
     saucer->hitbox.x = (saucer->spritePosX);
@@ -289,6 +310,7 @@ void updateSpriteHitbox(struct Saucer* saucer) {
 typedef struct Crosshair {
     Rectangle recticle;
     Color reticleColor;
+    bool clickedUFO;
 } Crosshair;
 
 
@@ -296,6 +318,7 @@ typedef struct Crosshair {
 void crosshairConstructor(struct Crosshair* crosshair) {
     crosshair->recticle = (Rectangle){0, 0, 1, 1};
     crosshair->reticleColor = BLANK;
+    crosshair->clickedUFO = false;
 }
 
 
@@ -306,6 +329,46 @@ void updateCrosshairPosition(struct Crosshair* crosshair) {
     crosshair->recticle.y = GetMousePosition().y;
 }
 // ========== END OF CROSSHAIR ================================================
+
+
+
+// ========== TIMER ===========================================================
+typedef struct Timer {
+    float spawnDelay;
+    float xMovementDelay;
+    float yMovementDelay;
+    float spawnTime;
+    float roundDelay;
+    double currentTime;
+} Timer;
+
+
+// Timer Initialization
+void timerConstructor(struct Timer* timer) {
+    timer->spawnDelay = 5.0;
+    timer->xMovementDelay = 1.0;
+    timer->yMovementDelay = 1.0;
+    timer->spawnTime = 5;
+    timer->roundDelay = 5;
+    timer->currentTime = 0;
+}
+
+
+// Timer Functions
+// start spawnDelay timer
+void spawnDelayTimer(struct Timer* timer) {
+    if (timer->spawnDelay >= 0) {
+        timer->spawnDelay-=timer->currentTime;
+    }
+}
+
+// reset spawnDelay timer
+void resetSpawnDelayTimer(struct Timer* timer) {
+    if (timer->spawnDelay <= 0) {
+        timer->spawnDelay = 5.0;
+    }
+}
+// ========== END OF TIMER ====================================================
 
 // ========== END OF SETUP ====================================================
 
@@ -327,10 +390,10 @@ int main(void) {
     spriteConstructor(saucer);
     Crosshair* crosshair = (Crosshair*)malloc(sizeof(Crosshair));
     crosshairConstructor(crosshair);
-
-    unsigned int status = 0;
-    unsigned int menuKey = 0;
-    unsigned int shotDown = 0;
+    Game* game = (Game*)malloc(sizeof(Game));
+    gameConstructor(game);
+    Timer* timer = (Timer*)malloc(sizeof(Timer));
+    timerConstructor(timer);
     // =========== END OF SETUP ===============================================
 
 
@@ -339,14 +402,9 @@ int main(void) {
     while (!WindowShouldClose()) {    // Detect window close button or ESC key
         // Update
         //---------------------------------------------------------------------
-        saucer->hitbox.x = (saucer->spritePosX);
-        saucer->hitbox.y = (saucer->spritePosY);
-        updateSpriteHitbox(saucer);
-        updateCrosshairPosition(crosshair);
-        checkSpriteBoundaries(saucer);
-
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionRecs(saucer->hitbox, crosshair->recticle)) {
-            shotDown = 1;
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+                CheckCollisionRecs(saucer->hitbox, crosshair->recticle)) {
+            crosshair->clickedUFO = true;
         }
         //---------------------------------------------------------------------
 
@@ -354,24 +412,36 @@ int main(void) {
         //---------------------------------------------------------------------
         BeginDrawing();
 
-            if (status == 0) {
+            if (game->status == 0) {
                 ClearBackground(BLACK);
-                eventMenuScroll(&status, &menuKey, GetKeyPressed());
-                eventMenuHighlight(menu, &menuKey);
+                eventMenuScroll(game, menu, GetKeyPressed());
+                eventMenuHighlight(menu);
                 DrawMenu(menu);
-            } else if (status == 1) {
+            } else if (game->status == 1) {
                 break;
             } else {
                 ClearBackground(BLACK);
-                eventGameOptions(&status, GetKeyPressed());
+                eventGameOptions(game, GetKeyPressed());
                 DrawHud(hud);
-                if (shotDown != 1) {
-                    DrawRectangleRec(saucer->hitbox, WHITE);
+                spawnDelayTimer(timer);
+                timer->currentTime = GetFrameTime();
+                
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+                        CheckCollisionRecs(saucer->hitbox,
+                            crosshair->recticle)) {
+                    crosshair->clickedUFO = true;
+                }
+
+                if (!crosshair->clickedUFO && timer->spawnDelay <= 0) {
+                    DrawRectangleRec(saucer->hitbox, BLANK);
                     DrawTexture(saucer->sprite, saucer->spritePosX,
                             saucer->spritePosY, saucer->spriteColor);
+                    updateSpriteHitbox(saucer);
+                    checkSpriteBoundaries(saucer);
+                    move(saucer, saucer->spriteSpeedModifier,
+                            saucer->spriteSpeedModifier);
                 }
-                move(saucer, saucer->spriteSpeedModifier,
-                        saucer->spriteSpeedModifier);
+                updateCrosshairPosition(crosshair);
                 DrawRectangleRec(crosshair->recticle, crosshair->reticleColor);
             }
 
@@ -390,5 +460,7 @@ int main(void) {
     free(hud);
     free(saucer);
     free(crosshair);
+    free(game);
+    free(timer);
     return 0;
 }
