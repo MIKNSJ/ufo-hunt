@@ -10,31 +10,51 @@
 #define SAUCER_HEIGHT 512
 #define WINDOW_TITLE "UFO Hunt"
 #define FPS_CAP 60
-
+#define PAUSE "[PAUSED]"
+#define PAUSE_POS_X 525
+#define PAUSE_POS_Y 200
+#define PAUSE_SIZE 50
+#define PAUSE_COLOR PINK
 
 
 // ========== SETUP ===========================================================
 // ========== GAME ============================================================
 typedef struct Game {
     unsigned int round;
-    unsigned int targetAmount;
+    unsigned int requiredHits;
+    unsigned int ammoRemaining;
     unsigned int status;
+    bool paused;
 } Game;
 
 
 // Game Initialization
 void gameConstructor(struct Game* game) {
     game->round = 0;
-    game->targetAmount = 10;
+    game->requiredHits = 10;
+    game->ammoRemaining = 3;
     game->status = 0;
+    game->paused = false;
 }
 
 
 // GAME FUNCTIONS
 // selects the game options
-void eventGameOptions(struct Game* game, int inputKey) {
-    if (inputKey == KEY_M) {
+void eventGameOptions(struct Game* game, int *inputKey) {
+    // return to menu
+    if (*inputKey == KEY_M) {
         game->status = 0;
+    }
+    
+    // toggle game pause
+    if (*inputKey == KEY_P) {
+        if (game->paused == false) {
+            game->paused = true;
+            printf("[SYSTEM]: The game has been paused.\n");
+        } else {
+            game->paused = false;
+            printf("[SYSTEM]: The game has been unpaused.\n");
+        }
     }
 }
 // ========= END OF GAME ======================================================
@@ -133,15 +153,15 @@ void eventMenuHighlight(struct Menu* menu) {
 
 
 // navigates the menu options
-void eventMenuScroll(struct Game* game, struct Menu* menu, int inputKey) { 
-    if (inputKey == KEY_W || inputKey == KEY_UP) {
+void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey) { 
+    if (*inputKey == KEY_W || *inputKey == KEY_UP) {
         if (menu->key == 1) {
             menu->key = 2;
         } else {
             menu->key = 1;
         }
     }
-    if (inputKey == KEY_S || inputKey == KEY_DOWN) {
+    if (*inputKey == KEY_S || *inputKey == KEY_DOWN) {
         if (menu->key == 1) {
             menu->key = 2;
         } else {
@@ -149,11 +169,11 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int inputKey) {
         }
     }
     
-    if (menu->key == 2 && (inputKey == KEY_ENTER)) {
+    if (menu->key == 2 && (*inputKey == KEY_ENTER)) {
         game->status = 1;
     }
 
-    if (menu->key == 1 && (inputKey == KEY_ENTER)) {
+    if (menu->key == 1 && (*inputKey == KEY_ENTER)) {
         game->status = 2;
     }
 }
@@ -238,7 +258,7 @@ void DrawHud(struct HUD* hud) {
 // ========== SPRITE ==========================================================
 typedef struct Saucer {
     Texture2D sprite;
-    int spritePosX, spritePosY, spriteSpeedModifier;
+    double spritePosX, spritePosY, spriteSpeedModifier;
     Rectangle hitbox;
     Rectangle source;
     Rectangle destination;
@@ -271,11 +291,10 @@ void spriteConstructor(struct Saucer* saucer) {
 
 // Sprite Functions
 // Sprite Movement
-void move(struct Saucer* saucer, float offSetX, float offSetY) {
-    saucer->spritePosX = saucer->spritePosX + offSetX;
-    saucer->spritePosY = saucer->spritePosY + offSetY;
+void move(struct Saucer* saucer, double offSetX, double offSetY) {
+    saucer->spritePosX+=offSetX;
+    saucer->spritePosY-=offSetY;
 }
-
 
 // Sprite Boundaries
 void checkSpriteBoundaries(struct Saucer* saucer) {
@@ -296,11 +315,16 @@ void checkSpriteBoundaries(struct Saucer* saucer) {
     }
 }
 
-
 // Sprite Hitbox
 void updateSpriteHitbox(struct Saucer* saucer) {
     saucer->hitbox.x = (saucer->spritePosX);
     saucer->hitbox.y = (saucer->spritePosY);
+}
+
+// Sprite Spawn Point
+void resetSpriteSpawn(struct Saucer* saucer) {
+    saucer->spritePosX = rand() % 1280;
+    saucer->spritePosY = 460;
 }
 // ========== END OF SPRITE ===================================================
 
@@ -348,7 +372,7 @@ void timerConstructor(struct Timer* timer) {
     timer->spawnDelay = 3.0;
     timer->xMovementDelay = 1.0;
     timer->yMovementDelay = 1.0;
-    timer->despawnDelay = 10.0;
+    timer->despawnDelay = 8.0;
     timer->roundDelay = 5;
     timer->currentTime = 0;
 }
@@ -380,7 +404,7 @@ void startDespawnDelay(struct Timer* timer) {
 // restart despawnTime timer
 void restartDespawnDelay(struct Timer* timer) {
     if (timer->despawnDelay <= 0) {
-        timer->despawnDelay = 10.0;
+        timer->despawnDelay = 8.0;
     }
 }
 // ========== END OF TIMER ====================================================
@@ -392,11 +416,14 @@ void restartDespawnDelay(struct Timer* timer) {
 int main(void) {
     // ========== SETUP =======================================================
     // Window (Declaration and intialization)
+    printf("[SYSTEM]: Setting up window...\n");
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE);
     SetTargetFPS(FPS_CAP);
     srand(time(NULL));
+    printf("[SYSTEM]: Window setup complete.\n");
 
     // Initialization
+    printf("[SYSTEM]: Setting up game elements...\n");
     Menu* menu = (Menu*)malloc(sizeof(Menu));
     menuConstructor(menu);
     HUD* hud = (HUD*)malloc(sizeof(HUD));
@@ -409,6 +436,9 @@ int main(void) {
     gameConstructor(game);
     Timer* timer = (Timer*)malloc(sizeof(Timer));
     timerConstructor(timer);
+
+    int inputKey;
+    printf("[SYSTEM]: Game setup complete.\n");
     // =========== END OF SETUP ===============================================
 
 
@@ -417,51 +447,70 @@ int main(void) {
     while (!WindowShouldClose()) {    // Detect window close button or ESC key
         // Update
         //---------------------------------------------------------------------
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
-                CheckCollisionRecs(saucer->hitbox, crosshair->recticle)) {
-            crosshair->clickedUFO = true;
-        }
+
         //---------------------------------------------------------------------
 
-        printf("%f", timer->currentTime);
         // Draw
         //---------------------------------------------------------------------
         BeginDrawing();
 
             if (game->status == 0) {
+                //printf("[SYSTEM]: The menu is now queued.\n");
                 ClearBackground(BLACK);
-                eventMenuScroll(game, menu, GetKeyPressed());
+                inputKey = GetKeyPressed();
+                eventMenuScroll(game, menu, &inputKey);
                 eventMenuHighlight(menu);
                 DrawMenu(menu);
+                //printf("[SYSTEM]: The menu is now generated.\n");
             } else if (game->status == 1) {
+                //printf("[SYSTEM]: Enabled early exit of program.\n");
                 break;
             } else {
+                //printf("[SYSTEM]: Currently in-game.\n");
                 ClearBackground(BLACK);
-                eventGameOptions(game, GetKeyPressed());
+                inputKey = GetKeyPressed();
+                eventGameOptions(game, &inputKey);
                 DrawHud(hud);
-                startSpawnDelay(timer);
-                startDespawnDelay(timer);
-                timer->currentTime = GetFrameTime();
-                
+
+                // Debug Print Statements
+                //-------------------------------------------------------------
+
+                //-------------------------------------------------------------
+
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
-                        CheckCollisionRecs(saucer->hitbox,
-                            crosshair->recticle)) {
+                    CheckCollisionRecs(saucer->hitbox, crosshair->recticle) &&
+                    game->paused == false) {
                     crosshair->clickedUFO = true;
                 }
 
+                if (game->paused == false) {
+                    startSpawnDelay(timer);
+                    startDespawnDelay(timer);
+                    timer->currentTime = GetFrameTime();
+                } else {
+                    DrawText(PAUSE, PAUSE_POS_X, PAUSE_POS_Y, PAUSE_SIZE,
+                            PINK);
+                }
+                
                 if (!crosshair->clickedUFO && timer->spawnDelay <= 0) {
                     DrawRectangleRec(saucer->hitbox, BLANK);
                     DrawTexture(saucer->sprite, saucer->spritePosX,
                             saucer->spritePosY, saucer->spriteColor);
-                    updateSpriteHitbox(saucer);
-                    checkSpriteBoundaries(saucer);
-                    move(saucer, saucer->spriteSpeedModifier,
-                            saucer->spriteSpeedModifier);
+
+                    if (game->paused == false) {
+                        updateSpriteHitbox(saucer);
+                        checkSpriteBoundaries(saucer);
+                        move(saucer,1, 1);
+                    } else {
+                        DrawText(PAUSE, PAUSE_POS_X, PAUSE_POS_Y, PAUSE_SIZE,
+                            PINK);
+                    }   
                 }
 
                 if (crosshair->clickedUFO || timer->despawnDelay <= 0) {
                     restartSpawnDelay(timer);
                     restartDespawnDelay(timer);
+                    resetSpriteSpawn(saucer);
                     crosshair->clickedUFO = false;
                 }
 
@@ -480,11 +529,13 @@ int main(void) {
     CloseWindow();        // Close window and OpenGL context
     //-------------------------------------------------------------------------
 
+    printf("[SYSTEM]: The window has been closed.\n");
     free(menu);
     free(hud);
     free(saucer);
     free(crosshair);
     free(game);
     free(timer);
+    printf("[SYSTEM]: The program has been terminated successfully.\n");
     return 0;
 }
