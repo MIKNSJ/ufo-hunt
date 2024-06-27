@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
@@ -23,10 +24,8 @@ typedef struct Game {
     Texture2D background;
     int backgroundPosX, backgroundPosY;
     Color backgroundColor;
-    unsigned int round;
-    unsigned int requiredHits;
-    unsigned int ammoRemaining;
-    unsigned int status;
+    unsigned int round, requiredHits, ammoRemaining, status;
+    int score, maxScore;
     bool paused;
 } Game;
 
@@ -38,6 +37,8 @@ void gameConstructor(struct Game* game) {
     game->backgroundPosY = 0;
     game->backgroundColor = WHITE;
     game->round = 0;
+    game->score = 0;
+    game->maxScore = 0;
     game->requiredHits = 10;
     game->ammoRemaining = 3;
     game->status = 0;
@@ -51,6 +52,7 @@ void eventGameOptions(struct Game* game, int *inputKey) {
     // return to menu
     if (*inputKey == KEY_M) {
         game->status = 0;
+        game->score = 0;
     }
     
     // toggle game pause
@@ -62,6 +64,32 @@ void eventGameOptions(struct Game* game, int *inputKey) {
             game->paused = false;
             printf("[SYSTEM]: The game has been unpaused.\n");
         }
+    }
+}
+
+// updates score based on quickness
+void updateScore(struct Game* game, float remainingTime) {
+    if (game->score < 1000000) {
+        if (remainingTime >= 4.0) {
+            game->score+=1000;
+        } else if (remainingTime >= 3.0 && remainingTime < 4.0) {
+            game->score+=800;
+        } else if (remainingTime >= 2.0 && remainingTime < 3.0) {
+            game->score+=600;
+        } else if (remainingTime >= 1.0 && remainingTime < 2.0) {
+            game->score+=400;
+        } else if (remainingTime >= 0.5 && remainingTime < 1.0) {
+            game->score+=200;
+        } else {
+            game->score+=100;
+        }
+    }
+}
+
+// updates max score
+void updateMaxScore(struct Game* game) {
+    if (game->maxScore < game->score) {
+        game->maxScore = game->score;
     }
 }
 // ========= END OF GAME ======================================================
@@ -101,7 +129,7 @@ typedef struct Menu {
     Rectangle playBox;
     const char* exit;
     Rectangle exitBox;
-    char* topScore;
+    char topScore[18];
     const char* copyright;
     int backgroundPosX, backgroundPosY,
         titlePosX, titlePosY, titleSize,
@@ -158,7 +186,8 @@ void menuConstructor(struct Menu* menu) {
     menu->exitBox.height = 50;
     menu->exitBoxColor = BLANK;
     
-    menu->topScore = "TOP SCORE:";
+    //menu->topScore = "TOP SCORE:";
+    strcpy(menu->topScore, "TOP SCORE: ");
     menu->topScorePosX = 475;
     menu->topScorePosY = 600;
     menu->topScoreSize = 25;
@@ -248,6 +277,13 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
         game->status = 2;
     }
 }
+
+// updates the top score per game
+void updateTopScore(struct Menu* menu, int maxScore) {
+    char scoreText[18];
+    sprintf(scoreText, "TOP SCORE: %d", maxScore);
+    strcpy(menu->topScore, scoreText);
+}
 // ========== END OF MENU =====================================================
 
 
@@ -259,7 +295,8 @@ typedef struct HUD {
     char* round;
     char* ammo;
     char* hit;
-    char* score;
+    //char* score;
+    char score[13];
 
     int backgroundPosX, backgroundPosY,
     borderPosX, borderPosY, borderSize,
@@ -309,7 +346,8 @@ void hudConstructor(struct HUD* hud) {
     hud->hitSize = 30;
     hud->hitColor = WHITE;
 
-    hud->score = "000000\nSCORE";
+    //hud->score = "000000\nSCORE";
+    strcpy(hud->score, "000000\nSCORE");
     hud->scorePosX = 1100;
     hud->scorePosY = 600;
     hud->scoreSize = 30;
@@ -331,6 +369,27 @@ void DrawHud(struct HUD* hud) {
             hud->hitColor);
     DrawText(hud->score, hud->scorePosX, hud->scorePosY, hud->scoreSize,
             hud->scoreColor);
+}
+
+// converts score to text
+void scoreToText(struct HUD* hud, int score) {
+   char strScore[13];
+
+   if (score < 10) {
+       sprintf(strScore, "00000%d\nSCORE", score);
+   } else if (score >= 10 && score < 100) {
+       sprintf(strScore, "0000%d\nSCORE", score);
+   } else if (score >= 100 && score < 1000) {
+       sprintf(strScore, "000%d\nSCORE", score);
+   } else if (score >= 1000 && score < 10000) {
+       sprintf(strScore, "00%d\nSCORE", score);
+   } else if (score >= 10000 && score < 100000) {
+       sprintf(strScore, "0%d\nSCORE", score);
+   } else {
+       sprintf(strScore, "%d\nSCORE", score);
+   }
+
+   strcpy(hud->score, strScore);
 }
 // ========== END OF HUD ======================================================
 
@@ -451,6 +510,7 @@ typedef struct Timer {
     float yMovementDelay;
     float despawnDelay;
     float roundDelay;
+    float scoreDelay;
     double currentTime;
 } Timer;
 
@@ -458,7 +518,7 @@ typedef struct Timer {
 // Timer Initialization
 void timerConstructor(struct Timer* timer) {
     timer->spawnDelay = 3.0;
-    timer->despawnDelay = 8.0;
+    timer->despawnDelay = 5.0;
     timer->xMovementDelay = 1;
     timer->yMovementDelay = 1;
     timer->roundDelay = 5;
@@ -481,7 +541,6 @@ void restartSpawnDelay(struct Timer* timer) {
     }
 }
 
-
 // start despawnTime timer
 void startDespawnDelay(struct Timer* timer) {
     if (timer->despawnDelay >= 0) {
@@ -492,7 +551,7 @@ void startDespawnDelay(struct Timer* timer) {
 // restart despawnTime timer
 void restartDespawnDelay(struct Timer* timer) {
     if (timer->despawnDelay <= 0) {
-        timer->despawnDelay = 8.0;
+        timer->despawnDelay = 5.0;
     }
 }
 
@@ -522,7 +581,7 @@ void restartYMovementDelay(struct Timer* timer) {
     if (timer->yMovementDelay <= 0) {
         timer->yMovementDelay = 2;
     }
-} 
+}
 // ========== END OF TIMER ====================================================
 // ========== END OF SETUP ====================================================
 
@@ -604,9 +663,6 @@ int main(void) {
 
                 if (game->paused == false) {
                     startSpawnDelay(timer);
-                    startDespawnDelay(timer);
-                    startXMovementDelay(timer);
-                    startYMovementDelay(timer);
                     timer->currentTime = GetFrameTime();
                 } else {
                     DrawText(PAUSE, PAUSE_POS_X, PAUSE_POS_Y, PAUSE_SIZE,
@@ -614,6 +670,9 @@ int main(void) {
                 }
                 
                 if (!crosshair->clickedUFO && timer->spawnDelay <= 0) {
+                    startDespawnDelay(timer);
+                    startXMovementDelay(timer);
+                    startYMovementDelay(timer);
                     DrawRectangleRec(saucer->hitbox, BLANK);
                     DrawTexture(saucer->sprite, saucer->spritePosX,
                             saucer->spritePosY, saucer->spriteColor);
@@ -642,11 +701,16 @@ int main(void) {
                 }
 
                 if (crosshair->clickedUFO || timer->despawnDelay <= 0) {
+                    updateScore(game, timer->despawnDelay);
+                    scoreToText(hud, game->score);
+                    updateMaxScore(game);
+                    updateTopScore(menu, game->maxScore);
                     restartSpawnDelay(timer);
                     restartDespawnDelay(timer);
-                    resetSpriteSpawn(saucer);
                     restartXMovementDelay(timer);
                     restartYMovementDelay(timer);
+                    resetSpriteSpawn(saucer);
+                    updateSpriteHitbox(saucer);
                     saucer->spriteDirectionX = 1;
                     saucer->spriteDirectionY = 1;
                     crosshair->clickedUFO = false;
