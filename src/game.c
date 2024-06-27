@@ -20,6 +20,9 @@
 // ========== SETUP ===========================================================
 // ========== GAME ============================================================
 typedef struct Game {
+    Texture2D background;
+    int backgroundPosX, backgroundPosY;
+    Color backgroundColor;
     unsigned int round;
     unsigned int requiredHits;
     unsigned int ammoRemaining;
@@ -30,6 +33,10 @@ typedef struct Game {
 
 // Game Initialization
 void gameConstructor(struct Game* game) {
+    game->background = LoadTexture("../assets/game_background.png");
+    game->backgroundPosX = 0;
+    game->backgroundPosY = 0;
+    game->backgroundColor = WHITE;
     game->round = 0;
     game->requiredHits = 10;
     game->ammoRemaining = 3;
@@ -61,21 +68,53 @@ void eventGameOptions(struct Game* game, int *inputKey) {
 
 
 
+// ========== CROSSHAIR =======================================================
+typedef struct Crosshair {
+    Rectangle recticle;
+    Color reticleColor;
+    bool clickedUFO;
+} Crosshair;
+
+
+// Crosshair Initialization
+void crosshairConstructor(struct Crosshair* crosshair) {
+    crosshair->recticle = (Rectangle){0, 0, 1, 1};
+    crosshair->reticleColor = BLANK;
+    crosshair->clickedUFO = false;
+}
+
+
+// Crosshair Functions
+// Update Crosshair position
+void updateCrosshairPosition(struct Crosshair* crosshair) {
+    crosshair->recticle.x = GetMousePosition().x;
+    crosshair->recticle.y = GetMousePosition().y;
+}
+
+
+
 // ========== MENU ============================================================
 typedef struct Menu {
+    Texture2D background;
     const char* title;
     const char* play;
+    Rectangle playBox;
     const char* exit;
+    Rectangle exitBox;
     char* topScore;
     const char* copyright;
-    int titlePosX, titlePosY, titleSize,
+    int backgroundPosX, backgroundPosY,
+        titlePosX, titlePosY, titleSize,
         playPosX, playPosY, playSize,
         exitPosX, exitPosY, exitSize,
         topScorePosX, topScorePosY, topScoreSize,
         copyrightPosX, copyrightPosY, copyrightSize;
     Color titleColor;
+    Color backgroundColor;
     Color playColor;
+    Color playBoxColor;
     Color exitColor;
+    Color exitBoxColor;
     Color topScoreColor;
     Color copyrightColor;
     unsigned int key;
@@ -84,35 +123,52 @@ typedef struct Menu {
 
 // MENU INITIALIZATION
 void menuConstructor(struct Menu* menu) {
+    menu->background = LoadTexture("../assets/menu_background.png");
+    menu->backgroundPosX = 0;
+    menu->backgroundPosY = 0;
+    menu->backgroundColor = WHITE;
+
     menu->title = "UFO Hunt";
     menu->titlePosX = 175;
     menu->titlePosY = 25;
     menu->titleSize = 200;
-    menu->titleColor = WHITE;
+    menu->titleColor = GREEN;
     
     menu->play = "PLAY";
     menu->playPosX = 550;
     menu->playPosY = 400;
     menu->playSize = 50;
-    menu->playColor = WHITE;
+    menu->playColor = GREEN;
+
+    menu->playBox.x = 540;
+    menu->playBox.y = 400;
+    menu->playBox.width = 150;
+    menu->playBox.height = 50;
+    menu->playBoxColor = BLANK;
     
     menu->exit = "EXIT";
     menu->exitPosX = 550;
     menu->exitPosY = 500;
     menu->exitSize = 50;
-    menu->exitColor = WHITE;
+    menu->exitColor = GREEN;
+
+    menu->exitBox.x = 540;
+    menu->exitBox.y = 500;
+    menu->exitBox.width = 150;
+    menu->exitBox.height = 50;
+    menu->exitBoxColor = BLANK;
     
     menu->topScore = "TOP SCORE:";
     menu->topScorePosX = 475;
     menu->topScorePosY = 600;
     menu->topScoreSize = 25;
-    menu->topScoreColor = WHITE;
+    menu->topScoreColor = GREEN;
     
     menu->copyright= "@2024 MADE BY MIKNSJ.";
     menu->copyrightPosX = 475;
     menu->copyrightPosY = 650;
     menu->copyrightSize = 25;
-    menu->copyrightColor = WHITE;
+    menu->copyrightColor = GREEN;
 
     menu->key = 0;
 }
@@ -121,10 +177,14 @@ void menuConstructor(struct Menu* menu) {
 // MENU FUNCTIONS
 // draws the menu
 void DrawMenu(struct Menu* menu) {
+    DrawTexture(menu->background, menu->backgroundPosX, menu->backgroundPosY,
+            menu->backgroundColor);
     DrawText(menu->title, menu->titlePosX, menu->titlePosY,
             menu->titleSize, menu->titleColor);
+    DrawRectangleRec(menu->playBox, menu->playBoxColor);
     DrawText(menu->play, menu->playPosX, menu->playPosY,
             menu->playSize, menu->playColor);
+    DrawRectangleRec(menu->exitBox, menu->exitBoxColor);
     DrawText(menu->exit, menu->exitPosX, menu->exitPosY,
             menu->exitSize, menu->exitColor);
     DrawText(menu->topScore, menu->topScorePosX, menu->topScorePosY,
@@ -140,11 +200,11 @@ void eventMenuHighlight(struct Menu* menu) {
     switch (key) {
         case 1:
             menu->playColor = RED;
-            menu->exitColor = WHITE;
+            menu->exitColor = GREEN;
             break;
         case 2:
             menu->exitColor = RED;
-            menu->playColor = WHITE;
+            menu->playColor = GREEN;
             break;
         default:
             break;
@@ -153,7 +213,10 @@ void eventMenuHighlight(struct Menu* menu) {
 
 
 // navigates the menu options
-void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey) { 
+void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
+        struct Crosshair* crosshair) { 
+    bool clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+
     if (*inputKey == KEY_W || *inputKey == KEY_UP) {
         if (menu->key == 1) {
             menu->key = 2;
@@ -168,12 +231,20 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey) {
             menu->key = 1;
         }
     }
+
+    if (CheckCollisionRecs(menu->playBox, crosshair->recticle)) {
+        menu->key = 1;
+    } 
+
+    if (CheckCollisionRecs(menu->exitBox, crosshair->recticle)) {
+        menu->key = 2;
+    }
     
-    if (menu->key == 2 && (*inputKey == KEY_ENTER)) {
+    if (menu->key == 2 && ((*inputKey == KEY_ENTER) || clicked)) {
         game->status = 1;
     }
 
-    if (menu->key == 1 && (*inputKey == KEY_ENTER)) {
+    if (menu->key == 1 && ((*inputKey == KEY_ENTER) || clicked)) {
         game->status = 2;
     }
 }
@@ -183,18 +254,21 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey) {
 
 // ========= HUD ==============================================================
 typedef struct HUD {
+    Rectangle background;
     char* border;
     char* round;
     char* ammo;
     char* hit;
     char* score;
 
-    int borderPosX, borderPosY, borderSize,
+    int backgroundPosX, backgroundPosY,
+    borderPosX, borderPosY, borderSize,
     roundPosX, roundPosY, roundSize,
     ammoPosX, ammoPosY, ammoSize,
     hitPosX, hitPosY, hitSize,
     scorePosX, scorePosY, scoreSize;
 
+    Color backgroundColor;
     Color borderColor;
     Color roundColor;
     Color ammoColor;
@@ -205,41 +279,48 @@ typedef struct HUD {
 
 // HUD Initialization
 void hudConstructor(struct HUD* hud) {
+    hud->background.width = 1280;
+    hud->background.height = 195;
+    hud->background.x = 0;
+    hud->background.y = 535;
+    hud->backgroundColor = BLACK;
+
     hud->border = "===================================================";
     hud->borderPosX = 5;
     hud->borderPosY = 525;
     hud->borderSize = 50;
-    hud->borderColor = RAYWHITE;
+    hud->borderColor = WHITE;
 
     hud->round = "R = 1";
     hud->roundPosX = 100;
     hud->roundPosY = 600;
     hud->roundSize = 30;
-    hud->roundColor = RAYWHITE;
+    hud->roundColor = WHITE;
 
     hud->ammo = "[*][*][*]\nSHOT";
     hud->ammoPosX = 275;
     hud->ammoPosY = 600;
     hud->ammoSize = 30;
-    hud->ammoColor = RAYWHITE;
+    hud->ammoColor = WHITE;
 
     hud->hit = "HIT   [  ][  ][  ][  ][  ][  ][  ][  ][  ][  ][  ]";
     hud->hitPosX = 475;
     hud->hitPosY = 600;
     hud->hitSize = 30;
-    hud->hitColor = RAYWHITE;
+    hud->hitColor = WHITE;
 
     hud->score = "000000\nSCORE";
     hud->scorePosX = 1100;
     hud->scorePosY = 600;
     hud->scoreSize = 30;
-    hud->scoreColor = RAYWHITE;
+    hud->scoreColor = WHITE;
 }
 
 
 // HUD Functions
 // displays the game hud
 void DrawHud(struct HUD* hud) {
+    DrawRectangleRec(hud->background, hud->backgroundColor);
     DrawText(hud->border, hud->borderPosX, hud->borderPosY, hud->borderSize,
             hud->roundColor);
     DrawText(hud->round, hud->roundPosX, hud->roundPosY, hud->roundSize,
@@ -360,32 +441,6 @@ void resetSpriteYDirection(struct Saucer* saucer) {
     saucer->spriteDirectionY = orientation;
 }
 // ========== END OF SPRITE ===================================================
-
-
-
-// ========== CROSSHAIR =======================================================
-typedef struct Crosshair {
-    Rectangle recticle;
-    Color reticleColor;
-    bool clickedUFO;
-} Crosshair;
-
-
-// Crosshair Initialization
-void crosshairConstructor(struct Crosshair* crosshair) {
-    crosshair->recticle = (Rectangle){0, 0, 1, 1};
-    crosshair->reticleColor = BLANK;
-    crosshair->clickedUFO = false;
-}
-
-
-// Crosshair Functions
-// Update Crosshair position
-void updateCrosshairPosition(struct Crosshair* crosshair) {
-    crosshair->recticle.x = GetMousePosition().x;
-    crosshair->recticle.y = GetMousePosition().y;
-}
-// ========== END OF CROSSHAIR ================================================
 
 
 
@@ -518,9 +573,11 @@ int main(void) {
                 //printf("[SYSTEM]: The menu is now queued.\n");
                 ClearBackground(BLACK);
                 inputKey = GetKeyPressed();
-                eventMenuScroll(game, menu, &inputKey);
+                eventMenuScroll(game, menu, &inputKey, crosshair);
                 eventMenuHighlight(menu);
                 DrawMenu(menu);
+                updateCrosshairPosition(crosshair);
+                DrawRectangleRec(crosshair->recticle, crosshair->reticleColor);
                 //printf("[SYSTEM]: The menu is now generated.\n");
             } else if (game->status == 1) {
                 //printf("[SYSTEM]: Enabled early exit of program.\n");
@@ -528,6 +585,8 @@ int main(void) {
             } else {
                 //printf("[SYSTEM]: Currently in-game.\n");
                 ClearBackground(BLACK);
+                DrawTexture(game->background, game->backgroundPosX,
+                        game->backgroundPosY, game->backgroundColor);
                 inputKey = GetKeyPressed();
                 eventGameOptions(game, &inputKey);
                 DrawHud(hud);
