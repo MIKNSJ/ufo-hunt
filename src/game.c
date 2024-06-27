@@ -258,7 +258,8 @@ void DrawHud(struct HUD* hud) {
 // ========== SPRITE ==========================================================
 typedef struct Saucer {
     Texture2D sprite;
-    double spritePosX, spritePosY, spriteSpeedModifier;
+    double spritePosX, spritePosY, spriteSpeedModifier, spriteDirectionX,
+           spriteDirectionY;
     Rectangle hitbox;
     Rectangle source;
     Rectangle destination;
@@ -273,7 +274,9 @@ void spriteConstructor(struct Saucer* saucer) {
     saucer->sprite = LoadTexture("../assets/saucer.png");
     saucer->sprite.width = 75;
     saucer->sprite.height = 75;
-    saucer->spriteSpeedModifier = 1;
+    saucer->spriteSpeedModifier = 3;
+    saucer->spriteDirectionX = 1;
+    saucer->spriteDirectionY = 1;
     saucer->hitbox = (Rectangle){0, 0, 75, 75};
     
     // DrawTexture
@@ -300,18 +303,34 @@ void move(struct Saucer* saucer, double offSetX, double offSetY) {
 void checkSpriteBoundaries(struct Saucer* saucer) {
     if (saucer->spritePosX < 0) {
         saucer->spritePosX = 0;
+
+        if (saucer->spriteDirectionX < 0) {
+            saucer->spriteDirectionX*=-1;
+        }
     }
 
     if (saucer->spritePosX > 1200) {
         saucer->spritePosX = 1200;
+
+        if (saucer->spriteDirectionX > 0) {
+            saucer->spriteDirectionX*=-1;
+        }
     }
 
     if (saucer->spritePosY < 0) {
         saucer->spritePosY = 0;
+
+        if (saucer->spriteDirectionY > 0) {
+            saucer->spriteDirectionY*=-1;
+        }
     }
 
     if (saucer->spritePosY > 460) {
         saucer->spritePosY = 460;
+
+        if (saucer->spriteDirectionY < 0) {
+            saucer->spriteDirectionY*=-1;
+        }
     }
 }
 
@@ -325,6 +344,20 @@ void updateSpriteHitbox(struct Saucer* saucer) {
 void resetSpriteSpawn(struct Saucer* saucer) {
     saucer->spritePosX = rand() % 1280;
     saucer->spritePosY = 460;
+}
+
+// Sprite X Direction
+void resetSpriteXDirection(struct Saucer* saucer) {
+    int angle = rand();
+    double orientation = cos(angle);
+    saucer->spriteDirectionX = orientation;
+}
+
+// Sprite Y Direction
+void resetSpriteYDirection(struct Saucer* saucer) {
+    int angle = rand();
+    double orientation = sin(angle);
+    saucer->spriteDirectionY = orientation;
 }
 // ========== END OF SPRITE ===================================================
 
@@ -370,9 +403,9 @@ typedef struct Timer {
 // Timer Initialization
 void timerConstructor(struct Timer* timer) {
     timer->spawnDelay = 3.0;
-    timer->xMovementDelay = 1.0;
-    timer->yMovementDelay = 1.0;
     timer->despawnDelay = 8.0;
+    timer->xMovementDelay = 1;
+    timer->yMovementDelay = 1;
     timer->roundDelay = 5;
     timer->currentTime = 0;
 }
@@ -407,8 +440,35 @@ void restartDespawnDelay(struct Timer* timer) {
         timer->despawnDelay = 8.0;
     }
 }
-// ========== END OF TIMER ====================================================
 
+// start xMovementDelay
+void startXMovementDelay(struct Timer* timer) {
+    if (timer->xMovementDelay >= 0) {
+        timer->xMovementDelay-=timer->currentTime;
+    }
+} 
+
+// restart xMovementDelay
+void restartXMovementDelay(struct Timer* timer) {
+    if (timer->xMovementDelay <= 0) {
+        timer->xMovementDelay = 2;
+    }
+} 
+
+// start yMovementDelay
+void startYMovementDelay(struct Timer* timer) {
+    if (timer->yMovementDelay >= 0) {
+        timer->yMovementDelay-=timer->currentTime;
+    }
+} 
+
+// restart yMovementDelay
+void restartYMovementDelay(struct Timer* timer) {
+    if (timer->yMovementDelay <= 0) {
+        timer->yMovementDelay = 2;
+    }
+} 
+// ========== END OF TIMER ====================================================
 // ========== END OF SETUP ====================================================
 
 
@@ -474,7 +534,7 @@ int main(void) {
 
                 // Debug Print Statements
                 //-------------------------------------------------------------
-
+                //
                 //-------------------------------------------------------------
 
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
@@ -486,6 +546,8 @@ int main(void) {
                 if (game->paused == false) {
                     startSpawnDelay(timer);
                     startDespawnDelay(timer);
+                    startXMovementDelay(timer);
+                    startYMovementDelay(timer);
                     timer->currentTime = GetFrameTime();
                 } else {
                     DrawText(PAUSE, PAUSE_POS_X, PAUSE_POS_Y, PAUSE_SIZE,
@@ -500,7 +562,20 @@ int main(void) {
                     if (game->paused == false) {
                         updateSpriteHitbox(saucer);
                         checkSpriteBoundaries(saucer);
-                        move(saucer,1, 1);
+                        move(saucer, saucer->spriteSpeedModifier *
+                                saucer->spriteDirectionX,
+                                saucer->spriteSpeedModifier *
+                                saucer->spriteDirectionY);
+
+                        if (timer->xMovementDelay <= 0) {
+                            resetSpriteXDirection(saucer);
+                            restartXMovementDelay(timer);
+                        }
+
+                        if (timer->yMovementDelay <= 0) {
+                            resetSpriteYDirection(saucer);
+                            restartYMovementDelay(timer);
+                        }
                     } else {
                         DrawText(PAUSE, PAUSE_POS_X, PAUSE_POS_Y, PAUSE_SIZE,
                             PINK);
@@ -511,6 +586,10 @@ int main(void) {
                     restartSpawnDelay(timer);
                     restartDespawnDelay(timer);
                     resetSpriteSpawn(saucer);
+                    restartXMovementDelay(timer);
+                    restartYMovementDelay(timer);
+                    saucer->spriteDirectionX = 1;
+                    saucer->spriteDirectionY = 1;
                     crosshair->clickedUFO = false;
                 }
 
