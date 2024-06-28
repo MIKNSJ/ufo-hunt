@@ -11,11 +11,6 @@
 #define SAUCER_HEIGHT 512
 #define WINDOW_TITLE "UFO Hunt"
 #define FPS_CAP 60
-#define PAUSE "[PAUSED]"
-#define PAUSE_POS_X 525
-#define PAUSE_POS_Y 200
-#define PAUSE_SIZE 50
-#define PAUSE_COLOR PINK
 
 
 
@@ -27,7 +22,7 @@ typedef struct Game {
     Color backgroundColor;
     unsigned int lives, targetAmount, status;
     int score, maxScore;
-    bool paused;
+    bool paused, gameOver;
 } Game;
 
 
@@ -43,6 +38,7 @@ void gameConstructor(struct Game* game) {
     game->targetAmount = 0;
     game->status = 0;
     game->paused = false;
+    game->gameOver = false;
 }
 
 
@@ -298,13 +294,15 @@ typedef struct HUD {
     char upgrade[28];
     //char* score;
     char score[13];
+    char *status;
 
     int backgroundPosX, backgroundPosY,
     borderPosX, borderPosY, borderSize,
     livesPosX, livesPosY, livesSize,
     speedPosX, speedPosY, speedSize,
     upgradePosX, upgradePosY, upgradeSize,
-    scorePosX, scorePosY, scoreSize;
+    scorePosX, scorePosY, scoreSize,
+    statusPosX, statusPosY, statusSize;
 
     Color backgroundColor;
     Color borderColor;
@@ -312,6 +310,7 @@ typedef struct HUD {
     Color speedColor;
     Color upgradeColor;
     Color scoreColor;
+    Color statusColor;
 } HUD; 
 
 
@@ -356,6 +355,12 @@ void hudConstructor(struct HUD* hud) {
     hud->scorePosY = 600;
     hud->scoreSize = 30;
     hud->scoreColor = WHITE;
+
+    hud->status = "[PAUSED]";
+    hud->statusPosX = 525;
+    hud->statusPosY = 200;
+    hud->statusSize = 50;
+    hud->statusColor = PINK;
 }
 
 
@@ -544,6 +549,7 @@ typedef struct Timer {
     float despawnDelay;
     float roundDelay;
     float scoreDelay;
+    float gameOverDelay;
     double currentTime;
 } Timer;
 
@@ -555,6 +561,7 @@ void timerConstructor(struct Timer* timer) {
     timer->xMovementDelay = 1;
     timer->yMovementDelay = 1;
     timer->roundDelay = 5;
+    timer->gameOverDelay = 3.0;
     timer->currentTime = 0;
 }
 
@@ -613,6 +620,21 @@ void restartYMovementDelay(struct Timer* timer) {
         timer->yMovementDelay = 2;
     }
 }
+
+// start gameOverDelay
+void startGameOverDelay(struct Timer* timer) {
+    if (timer->gameOverDelay >= 0) {
+        timer->gameOverDelay-=timer->currentTime;
+    }
+}
+
+
+// restart gameOverDelay
+void restartGameOverDelay(struct Timer* timer) {
+    if (timer->gameOverDelay <= 0) {
+        timer->gameOverDelay = 3.0;
+    }
+}
 // ========== END OF TIMER ====================================================
 
 
@@ -634,11 +656,14 @@ void reset(struct Game* game, struct Saucer* saucer, struct HUD* hud,
     strcpy(hud->speed, "S = 3");
     strcpy(hud->upgrade, "LEVEL UP UPGRADE IN = 0/10");
     strcpy(hud->score, "000000\nSCORE");
+    hud->status = "[PAUSED]";
+    hud->statusPosX = 525;
 
     restartSpawnDelay(timer);
     restartDespawnDelay(timer);
     restartXMovementDelay(timer);
     restartYMovementDelay(timer);
+    restartGameOverDelay(timer);
     resetSpriteSpawn(saucer);
     updateSpriteHitbox(saucer);
     saucer->spriteDirectionX = 1;
@@ -710,13 +735,26 @@ int main(void) {
                 inputKey = GetKeyPressed();
                 eventGameOptions(game, &inputKey);
                 DrawHud(hud);
+                timer->currentTime = GetFrameTime();
 
                 // Debug Print Statements
                 //-------------------------------------------------------------
                 //
                 //-------------------------------------------------------------
-                if (game->lives <= 0) {
-                    game->status = 0;
+                if (game->lives <= 99) {
+                    game->gameOver = true;
+                    game->paused = true;
+                }
+
+                if (game->gameOver && game->paused) {
+                    hud->status = "[GAME OVER]";
+                    hud->statusPosX = 500;
+                    startGameOverDelay(timer);
+
+                    if (timer->gameOverDelay <= 0) {
+                        game->status = 0;
+                        restartGameOverDelay(timer);
+                    }
                 }
 
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
@@ -762,10 +800,10 @@ int main(void) {
 
                 if (game->paused == false) {
                     startSpawnDelay(timer);
-                    timer->currentTime = GetFrameTime();
+                    //timer->currentTime = GetFrameTime();
                 } else {
-                    DrawText(PAUSE, PAUSE_POS_X, PAUSE_POS_Y, PAUSE_SIZE,
-                            PINK);
+                    DrawText(hud->status, hud->statusPosX, hud->statusPosY,
+                            hud->statusSize, hud->statusColor);
                 }
                 
                 if (!crosshair->clickedUFO && timer->spawnDelay <= 0) {
@@ -796,8 +834,8 @@ int main(void) {
                             restartYMovementDelay(timer);
                         }
                     } else {
-                        DrawText(PAUSE, PAUSE_POS_X, PAUSE_POS_Y, PAUSE_SIZE,
-                            PINK);
+                        DrawText(hud->status, hud->statusPosX, hud->statusPosY,
+                            hud->statusSize, hud->statusColor);
                     }   
                 }
 
