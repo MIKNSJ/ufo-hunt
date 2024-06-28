@@ -18,13 +18,14 @@
 #define PAUSE_COLOR PINK
 
 
+
 // ========== SETUP ===========================================================
 // ========== GAME ============================================================
 typedef struct Game {
     Texture2D background;
     int backgroundPosX, backgroundPosY;
     Color backgroundColor;
-    unsigned int round, requiredHits, ammoRemaining, status;
+    unsigned int lives, targetAmount, status;
     int score, maxScore;
     bool paused;
 } Game;
@@ -36,11 +37,10 @@ void gameConstructor(struct Game* game) {
     game->backgroundPosX = 0;
     game->backgroundPosY = 0;
     game->backgroundColor = WHITE;
-    game->round = 0;
+    game->lives = 100;
     game->score = 0;
     game->maxScore = 0;
-    game->requiredHits = 10;
-    game->ammoRemaining = 3;
+    game->targetAmount = 0;
     game->status = 0;
     game->paused = false;
 }
@@ -52,7 +52,6 @@ void eventGameOptions(struct Game* game, int *inputKey) {
     // return to menu
     if (*inputKey == KEY_M) {
         game->status = 0;
-        game->score = 0;
     }
     
     // toggle game pause
@@ -80,8 +79,10 @@ void updateScore(struct Game* game, float remainingTime) {
             game->score+=400;
         } else if (remainingTime >= 0.5 && remainingTime < 1.0) {
             game->score+=200;
-        } else {
+        } else if (remainingTime > 0 && remainingTime < 0.5) {
             game->score+=100;
+        } else {
+            game->score+=0;
         }
     }
 }
@@ -292,24 +293,24 @@ void updateTopScore(struct Menu* menu, int maxScore) {
 typedef struct HUD {
     Rectangle background;
     char* border;
-    char* round;
-    char* ammo;
-    char* hit;
+    char lives[8];
+    char speed[9];
+    char upgrade[28];
     //char* score;
     char score[13];
 
     int backgroundPosX, backgroundPosY,
     borderPosX, borderPosY, borderSize,
-    roundPosX, roundPosY, roundSize,
-    ammoPosX, ammoPosY, ammoSize,
-    hitPosX, hitPosY, hitSize,
+    livesPosX, livesPosY, livesSize,
+    speedPosX, speedPosY, speedSize,
+    upgradePosX, upgradePosY, upgradeSize,
     scorePosX, scorePosY, scoreSize;
 
     Color backgroundColor;
     Color borderColor;
-    Color roundColor;
-    Color ammoColor;
-    Color hitColor;
+    Color livesColor;
+    Color speedColor;
+    Color upgradeColor;
     Color scoreColor;
 } HUD; 
 
@@ -328,23 +329,26 @@ void hudConstructor(struct HUD* hud) {
     hud->borderSize = 50;
     hud->borderColor = WHITE;
 
-    hud->round = "R = 1";
-    hud->roundPosX = 100;
-    hud->roundPosY = 600;
-    hud->roundSize = 30;
-    hud->roundColor = WHITE;
+    //hud->lives = "L = 100";
+    strcpy(hud->lives, "L = 100");
+    hud->livesPosX = 100;
+    hud->livesPosY = 600;
+    hud->livesSize = 30;
+    hud->livesColor = WHITE;
 
-    hud->ammo = "[*][*][*]\nSHOT";
-    hud->ammoPosX = 275;
-    hud->ammoPosY = 600;
-    hud->ammoSize = 30;
-    hud->ammoColor = WHITE;
+    //hud->speed = "S = 1";
+    strcpy(hud->speed, "S = 3");
+    hud->speedPosX = 275;
+    hud->speedPosY = 600;
+    hud->speedSize = 30;
+    hud->speedColor = WHITE;
 
-    hud->hit = "HIT   [  ][  ][  ][  ][  ][  ][  ][  ][  ][  ][  ]";
-    hud->hitPosX = 475;
-    hud->hitPosY = 600;
-    hud->hitSize = 30;
-    hud->hitColor = WHITE;
+    //hud->upgrade = "LEVEL UP UPGRADE IN = 0/10";
+    strcpy(hud->upgrade, "LEVEL UP UPGRADE IN = 0/10");
+    hud->upgradePosX = 475;
+    hud->upgradePosY = 600;
+    hud->upgradeSize = 30;
+    hud->upgradeColor = WHITE;
 
     //hud->score = "000000\nSCORE";
     strcpy(hud->score, "000000\nSCORE");
@@ -360,13 +364,13 @@ void hudConstructor(struct HUD* hud) {
 void DrawHud(struct HUD* hud) {
     DrawRectangleRec(hud->background, hud->backgroundColor);
     DrawText(hud->border, hud->borderPosX, hud->borderPosY, hud->borderSize,
-            hud->roundColor);
-    DrawText(hud->round, hud->roundPosX, hud->roundPosY, hud->roundSize,
-            hud->roundColor);
-    DrawText(hud->ammo, hud->ammoPosX, hud->ammoPosY, hud->ammoSize,
-            hud->ammoColor);
-    DrawText(hud->hit, hud->hitPosX, hud->hitPosY, hud->hitSize,
-            hud->hitColor);
+            hud->borderColor);
+    DrawText(hud->lives, hud->livesPosX, hud->livesPosY, hud->livesSize,
+            hud->livesColor);
+    DrawText(hud->speed, hud->speedPosX, hud->speedPosY, hud->speedSize,
+            hud->speedColor);
+    DrawText(hud->upgrade, hud->upgradePosX, hud->upgradePosY,
+            hud->upgradeSize, hud->upgradeColor);
     DrawText(hud->score, hud->scorePosX, hud->scorePosY, hud->scoreSize,
             hud->scoreColor);
 }
@@ -390,6 +394,27 @@ void scoreToText(struct HUD* hud, int score) {
    }
 
    strcpy(hud->score, strScore);
+}
+
+// updates level up indicator
+void updateUpgrades(struct HUD* hud, int targetAmount) {
+    char str[28];
+    sprintf(str, "LEVEL UP UPGRADE IN = %d/10", targetAmount);
+    strcpy(hud->upgrade, str);
+}
+
+// updates speed indicator
+void updateSpeedDisplay(struct HUD* hud, double speed) {
+    char str[9];
+    sprintf(str, "S = %.2f", speed);
+    strcpy(hud->speed, str);
+}
+
+// updates lives indicator
+void updateLivesDisplay(struct HUD* hud, int lives) {
+    char str[8];
+    sprintf(str, "L = %d", lives);
+    strcpy(hud->lives, str);
 }
 // ========== END OF HUD ======================================================
 
@@ -499,6 +524,14 @@ void resetSpriteYDirection(struct Saucer* saucer) {
     double orientation = sin(angle);
     saucer->spriteDirectionY = orientation;
 }
+
+// Sprite Direction Normalization
+void normalizeDirection(struct Saucer* saucer) {
+    double magnitude = sqrt(pow(saucer->spriteDirectionX, 2.0) +
+            pow(saucer->spriteDirectionY, 2.0));
+    saucer->spriteDirectionX*=(1.0 / magnitude);
+    saucer->spriteDirectionY*=(1.0 / magnitude);
+}
 // ========== END OF SPRITE ===================================================
 
 
@@ -550,9 +583,7 @@ void startDespawnDelay(struct Timer* timer) {
 
 // restart despawnTime timer
 void restartDespawnDelay(struct Timer* timer) {
-    if (timer->despawnDelay <= 0) {
-        timer->despawnDelay = 5.0;
-    }
+    timer->despawnDelay = 5.0;
 }
 
 // start xMovementDelay
@@ -583,6 +614,38 @@ void restartYMovementDelay(struct Timer* timer) {
     }
 }
 // ========== END OF TIMER ====================================================
+
+
+
+// ========= UNIVERSAL FUNCTIONS ==============================================
+// resets to default statistics
+void reset(struct Game* game, struct Saucer* saucer, struct HUD* hud,
+        struct Timer* timer, struct Crosshair* crosshair) {
+    game->status = 0;
+    game->backgroundPosX = 0;
+    game->backgroundPosY = 0;
+    game->backgroundColor = WHITE;
+    game->lives = 100;
+    game->score = 0;
+    game->targetAmount = 0;
+    game->paused = false;
+
+    strcpy(hud->lives, "L = 100");
+    strcpy(hud->speed, "S = 3");
+    strcpy(hud->upgrade, "LEVEL UP UPGRADE IN = 0/10");
+    strcpy(hud->score, "000000\nSCORE");
+
+    restartSpawnDelay(timer);
+    restartDespawnDelay(timer);
+    restartXMovementDelay(timer);
+    restartYMovementDelay(timer);
+    resetSpriteSpawn(saucer);
+    updateSpriteHitbox(saucer);
+    saucer->spriteDirectionX = 1;
+    saucer->spriteDirectionY = 1;
+    crosshair->clickedUFO = false;
+}
+// ========= END OF UNIVERSAL FUNCTIONS =======================================
 // ========== END OF SETUP ====================================================
 
 
@@ -629,20 +692,18 @@ int main(void) {
         BeginDrawing();
 
             if (game->status == 0) {
-                //printf("[SYSTEM]: The menu is now queued.\n");
                 ClearBackground(BLACK);
+                reset(game, saucer, hud, timer, crosshair);
                 inputKey = GetKeyPressed();
                 eventMenuScroll(game, menu, &inputKey, crosshair);
                 eventMenuHighlight(menu);
+                updateTopScore(menu, game->maxScore);
                 DrawMenu(menu);
                 updateCrosshairPosition(crosshair);
                 DrawRectangleRec(crosshair->recticle, crosshair->reticleColor);
-                //printf("[SYSTEM]: The menu is now generated.\n");
             } else if (game->status == 1) {
-                //printf("[SYSTEM]: Enabled early exit of program.\n");
                 break;
             } else {
-                //printf("[SYSTEM]: Currently in-game.\n");
                 ClearBackground(BLACK);
                 DrawTexture(game->background, game->backgroundPosX,
                         game->backgroundPosY, game->backgroundColor);
@@ -654,11 +715,49 @@ int main(void) {
                 //-------------------------------------------------------------
                 //
                 //-------------------------------------------------------------
+                if (game->lives <= 0) {
+                    game->status = 0;
+                }
 
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
                     CheckCollisionRecs(saucer->hitbox, crosshair->recticle) &&
                     game->paused == false) {
                     crosshair->clickedUFO = true;
+                }
+
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+                        !CheckCollisionRecs(saucer->hitbox,
+                            crosshair->recticle) && game->paused == false) {
+                    game->lives--;
+                    updateLivesDisplay(hud, game->lives);
+                }
+
+                if (crosshair->clickedUFO || timer->despawnDelay <= 0) {
+                    if (crosshair->clickedUFO) {
+                        game->targetAmount++;
+                        updateUpgrades(hud, game->targetAmount);
+                    }
+                    
+                    updateScore(game, timer->despawnDelay);
+                    scoreToText(hud, game->score);
+                    updateMaxScore(game);
+                    restartSpawnDelay(timer);
+                    restartDespawnDelay(timer);
+                    restartXMovementDelay(timer);
+                    restartYMovementDelay(timer);
+                    resetSpriteSpawn(saucer);
+                    updateSpriteHitbox(saucer);
+                    saucer->spriteDirectionX = 1;
+                    saucer->spriteDirectionY = 1;
+                    crosshair->clickedUFO = false;
+                }
+
+                if (game->targetAmount == 10) {
+                    game->targetAmount = 0;
+                    game->lives+=10;
+                    updateUpgrades(hud, game->targetAmount);
+                    saucer->spriteSpeedModifier+=0.1;
+                    updateSpeedDisplay(hud, saucer->spriteSpeedModifier);
                 }
 
                 if (game->paused == false) {
@@ -670,16 +769,18 @@ int main(void) {
                 }
                 
                 if (!crosshair->clickedUFO && timer->spawnDelay <= 0) {
-                    startDespawnDelay(timer);
-                    startXMovementDelay(timer);
-                    startYMovementDelay(timer);
                     DrawRectangleRec(saucer->hitbox, BLANK);
                     DrawTexture(saucer->sprite, saucer->spritePosX,
                             saucer->spritePosY, saucer->spriteColor);
 
                     if (game->paused == false) {
+                        startDespawnDelay(timer);
+                        startXMovementDelay(timer);
+                        startYMovementDelay(timer);
+                        
                         updateSpriteHitbox(saucer);
                         checkSpriteBoundaries(saucer);
+                        normalizeDirection(saucer);
                         move(saucer, saucer->spriteSpeedModifier *
                                 saucer->spriteDirectionX,
                                 saucer->spriteSpeedModifier *
@@ -700,22 +801,6 @@ int main(void) {
                     }   
                 }
 
-                if (crosshair->clickedUFO || timer->despawnDelay <= 0) {
-                    updateScore(game, timer->despawnDelay);
-                    scoreToText(hud, game->score);
-                    updateMaxScore(game);
-                    updateTopScore(menu, game->maxScore);
-                    restartSpawnDelay(timer);
-                    restartDespawnDelay(timer);
-                    restartXMovementDelay(timer);
-                    restartYMovementDelay(timer);
-                    resetSpriteSpawn(saucer);
-                    updateSpriteHitbox(saucer);
-                    saucer->spriteDirectionX = 1;
-                    saucer->spriteDirectionY = 1;
-                    crosshair->clickedUFO = false;
-                }
-
                 updateCrosshairPosition(crosshair);
                 DrawRectangleRec(crosshair->recticle, crosshair->reticleColor);
             }
@@ -728,6 +813,9 @@ int main(void) {
 
     // De-Initialization
     //-------------------------------------------------------------------------
+    UnloadTexture(saucer->sprite);
+    UnloadTexture(menu->background);
+    UnloadTexture(game->background);
     CloseWindow();        // Close window and OpenGL context
     //-------------------------------------------------------------------------
 
