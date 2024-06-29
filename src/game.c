@@ -115,6 +115,7 @@ void updateCrosshairPosition(struct Crosshair* crosshair) {
     crosshair->recticle.x = GetMousePosition().x;
     crosshair->recticle.y = GetMousePosition().y;
 }
+// ========== END OF CROSSHAIR ================================================
 
 
 
@@ -134,14 +135,8 @@ typedef struct Menu {
         exitPosX, exitPosY, exitSize,
         topScorePosX, topScorePosY, topScoreSize,
         copyrightPosX, copyrightPosY, copyrightSize;
-    Color titleColor;
-    Color backgroundColor;
-    Color playColor;
-    Color playBoxColor;
-    Color exitColor;
-    Color exitBoxColor;
-    Color topScoreColor;
-    Color copyrightColor;
+    Color titleColor, backgroundColor, playColor, playBoxColor, exitColor,
+          exitBoxColor, topScoreColor, copyrightColor;
     unsigned int key;
 } Menu;
 
@@ -219,7 +214,6 @@ void DrawMenu(struct Menu* menu) {
             menu->copyrightSize, menu->copyrightColor);
 }
 
-
 // highlights the menu options
 void eventMenuHighlight(struct Menu* menu) {
     unsigned int key = menu->key;
@@ -236,7 +230,6 @@ void eventMenuHighlight(struct Menu* menu) {
             break;
     }
 }
-
 
 // navigates the menu options
 void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
@@ -297,8 +290,8 @@ void updateTopScore(struct Menu* menu, int maxScore) {
 typedef struct HUD {
     Rectangle background;
     char* border;
-    char lives[8];
-    char speed[9];
+    char lives[10];
+    char speed[10];
     char upgrade[28];
     //char* score;
     char score[13];
@@ -312,13 +305,8 @@ typedef struct HUD {
     scorePosX, scorePosY, scoreSize,
     statusPosX, statusPosY, statusSize;
 
-    Color backgroundColor;
-    Color borderColor;
-    Color livesColor;
-    Color speedColor;
-    Color upgradeColor;
-    Color scoreColor;
-    Color statusColor;
+    Color backgroundColor, borderColor, livesColor, speedColor, upgradeColor,
+          scoreColor, statusColor;
 } HUD; 
 
 
@@ -418,14 +406,14 @@ void updateUpgrades(struct HUD* hud, int targetAmount) {
 
 // updates speed indicator
 void updateSpeedDisplay(struct HUD* hud, double speed) {
-    char str[9];
+    char str[10];
     sprintf(str, "S = %.2f", speed);
     strcpy(hud->speed, str);
 }
 
 // updates lives indicator
 void updateLivesDisplay(struct HUD* hud, int lives) {
-    char str[8];
+    char str[10];
     sprintf(str, "L = %d", lives);
     strcpy(hud->lives, str);
 }
@@ -435,17 +423,13 @@ void updateLivesDisplay(struct HUD* hud, int lives) {
 
 // ========== SPRITE ==========================================================
 typedef struct Saucer {
-    Texture2D sprite;
-    Texture2D deathMark;
+    Texture2D sprite, deathMark;
     double spritePosX, spritePosY, spriteSpeedModifier, spriteDirectionX,
            spriteDirectionY, deathMarkPosX, deathMarkPosY;
-    Rectangle hitbox;
-    Rectangle source;
-    Rectangle destination;
+    Rectangle hitbox, source, destination;
     Vector2 origin;
     float rotation;
-    Color spriteColor;
-    Color deathMarkColor;
+    Color spriteColor, deathMarkColor;
 } Saucer;
 
 
@@ -696,7 +680,6 @@ void reset(struct Game* game, struct Saucer* saucer, struct HUD* hud,
 
 
 int main(void) {
-    // ========== SETUP =======================================================
     // Window (Declaration and intialization)
     printf("[SYSTEM]: Setting up window...\n");
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE);
@@ -738,7 +721,6 @@ int main(void) {
 
     int inputKey;
     printf("[SYSTEM]: Game setup complete.\n");
-    // =========== END OF SETUP ===============================================
 
 
 
@@ -867,7 +849,6 @@ int main(void) {
 
                 if (game->paused == false) {
                     startSpawnDelay(timer);
-                    //timer->currentTime = GetFrameTime();
                 } else {
                     DrawText(hud->status, hud->statusPosX, hud->statusPosY,
                             hud->statusSize, hud->statusColor);
@@ -933,13 +914,11 @@ int main(void) {
     CloseWindow();        // Close window and OpenGL context
     //-------------------------------------------------------------------------
 
-    printf("[SYSTEM]: The window has been closed.\n");
     free(menu);
     free(hud);
     free(saucer);
     free(crosshair);
     free(game);
     free(timer);
-    printf("[SYSTEM]: The program has been terminated successfully.\n");
     return 0;
 }
