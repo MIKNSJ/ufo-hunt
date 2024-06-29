@@ -240,7 +240,7 @@ void eventMenuHighlight(struct Menu* menu) {
 
 // navigates the menu options
 void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
-        struct Crosshair* crosshair) { 
+        struct Crosshair* crosshair, Sound scroll, Sound fire) { 
     bool clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 
     if (*inputKey == KEY_W || *inputKey == KEY_UP) {
@@ -249,6 +249,7 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
         } else {
             menu->key = 1;
         }
+        PlaySound(scroll);
     }
     if (*inputKey == KEY_S || *inputKey == KEY_DOWN) {
         if (menu->key == 1) {
@@ -256,14 +257,17 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
         } else {
             menu->key = 1;
         }
+        PlaySound(scroll);
     }
 
     if (CheckCollisionRecs(menu->playBox, crosshair->recticle)) {
         menu->key = 1;
+        PlaySound(scroll);
     } 
 
     if (CheckCollisionRecs(menu->exitBox, crosshair->recticle)) {
         menu->key = 2;
+        PlaySound(scroll);
     }
     
     if (menu->key == 2 && ((*inputKey == KEY_ENTER) || clicked)) {
@@ -272,6 +276,7 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
 
     if (menu->key == 1 && ((*inputKey == KEY_ENTER) || clicked)) {
         game->status = 2;
+        PlaySound(fire);
     }
 }
 
@@ -561,7 +566,7 @@ void timerConstructor(struct Timer* timer) {
     timer->xMovementDelay = 1;
     timer->yMovementDelay = 1;
     timer->roundDelay = 5;
-    timer->gameOverDelay = 3.0;
+    timer->gameOverDelay = 5.0;
     timer->currentTime = 0;
 }
 
@@ -632,7 +637,7 @@ void startGameOverDelay(struct Timer* timer) {
 // restart gameOverDelay
 void restartGameOverDelay(struct Timer* timer) {
     if (timer->gameOverDelay <= 0) {
-        timer->gameOverDelay = 3.0;
+        timer->gameOverDelay = 5.0;
     }
 }
 // ========== END OF TIMER ====================================================
@@ -684,6 +689,21 @@ int main(void) {
     srand(time(NULL));
     printf("[SYSTEM]: Window setup complete.\n");
 
+    // Audio
+    InitAudioDevice();
+    Sound bulletFired = LoadSound("../assets/m700-fire.wav");
+    Sound explosion = LoadSound("../assets/explosion.wav");
+    Sound menuScroll = LoadSound("../assets/sharp_echo.wav");
+    Music menuTheme = LoadMusicStream("../assets/space_station.wav");
+    SetMusicVolume(menuTheme, 1.0f);
+    menuTheme.looping = true;
+    Music gameTheme = LoadMusicStream("../assets/through_space.ogg");
+    SetMusicVolume(gameTheme, 1.0f);
+    gameTheme.looping = true;
+    Music loseTheme = LoadMusicStream("../assets/lose_trumpet.wav");
+    SetMusicVolume(loseTheme, 1.0f);
+    Music current;
+
     // Initialization
     printf("[SYSTEM]: Setting up game elements...\n");
     Menu* menu = (Menu*)malloc(sizeof(Menu));
@@ -698,6 +718,8 @@ int main(void) {
     gameConstructor(game);
     Timer* timer = (Timer*)malloc(sizeof(Timer));
     timerConstructor(timer);
+    current = menuTheme;
+    PlayMusicStream(current);
 
     int inputKey;
     printf("[SYSTEM]: Game setup complete.\n");
@@ -709,7 +731,19 @@ int main(void) {
     while (!WindowShouldClose()) {    // Detect window close button or ESC key
         // Update
         //---------------------------------------------------------------------
+        UpdateMusicStream(current);
 
+        if (game->status == 0 && !IsMusicStreamPlaying(menuTheme)) {
+            StopMusicStream(gameTheme);
+            current = menuTheme;
+            PlayMusicStream(current);
+        }
+
+        if (game->status == 2 && !IsMusicStreamPlaying(gameTheme)) {
+            StopMusicStream(menuTheme);
+            current = gameTheme;
+            PlayMusicStream(current);
+        }
         //---------------------------------------------------------------------
 
         // Draw
@@ -720,7 +754,8 @@ int main(void) {
                 ClearBackground(BLACK);
                 reset(game, saucer, hud, timer, crosshair);
                 inputKey = GetKeyPressed();
-                eventMenuScroll(game, menu, &inputKey, crosshair);
+                eventMenuScroll(game, menu, &inputKey, crosshair, menuScroll,
+                        bulletFired);
                 eventMenuHighlight(menu);
                 updateTopScore(menu, game->maxScore);
                 DrawMenu(menu);
@@ -739,9 +774,10 @@ int main(void) {
 
                 // Debug Print Statements
                 //-------------------------------------------------------------
-                //
+                
                 //-------------------------------------------------------------
-                if (game->lives <= 99) {
+                
+                if (game->lives <= 0) {
                     game->gameOver = true;
                     game->paused = true;
                 }
@@ -750,10 +786,14 @@ int main(void) {
                     hud->status = "[GAME OVER]";
                     hud->statusPosX = 500;
                     startGameOverDelay(timer);
+                    StopMusicStream(gameTheme);
+                    current = loseTheme;
+                    PlayMusicStream(current);
 
                     if (timer->gameOverDelay <= 0) {
                         game->status = 0;
                         restartGameOverDelay(timer);
+                        StopMusicStream(current);
                     }
                 }
 
@@ -761,6 +801,8 @@ int main(void) {
                     CheckCollisionRecs(saucer->hitbox, crosshair->recticle) &&
                     game->paused == false) {
                     crosshair->clickedUFO = true;
+                    PlaySound(bulletFired);
+                    PlaySound(explosion);
                 }
 
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
@@ -768,12 +810,18 @@ int main(void) {
                             crosshair->recticle) && game->paused == false) {
                     game->lives--;
                     updateLivesDisplay(hud, game->lives);
+                    PlaySound(bulletFired);
                 }
 
                 if (crosshair->clickedUFO || timer->despawnDelay <= 0) {
                     if (crosshair->clickedUFO) {
                         game->targetAmount++;
                         updateUpgrades(hud, game->targetAmount);
+                    }
+
+                    if (timer->despawnDelay <= 0) {
+                        game->lives--;
+                        updateLivesDisplay(hud, game->lives);
                     }
                     
                     updateScore(game, timer->despawnDelay);
@@ -793,6 +841,7 @@ int main(void) {
                 if (game->targetAmount == 10) {
                     game->targetAmount = 0;
                     game->lives+=10;
+                    updateLivesDisplay(hud, game->lives);
                     updateUpgrades(hud, game->targetAmount);
                     saucer->spriteSpeedModifier+=0.1;
                     updateSpeedDisplay(hud, saucer->spriteSpeedModifier);
@@ -804,6 +853,7 @@ int main(void) {
                 } else {
                     DrawText(hud->status, hud->statusPosX, hud->statusPosY,
                             hud->statusSize, hud->statusColor);
+                    PauseMusicStream(gameTheme);
                 }
                 
                 if (!crosshair->clickedUFO && timer->spawnDelay <= 0) {
@@ -836,6 +886,7 @@ int main(void) {
                     } else {
                         DrawText(hud->status, hud->statusPosX, hud->statusPosY,
                             hud->statusSize, hud->statusColor);
+                        PauseMusicStream(gameTheme);
                     }   
                 }
 
@@ -854,6 +905,12 @@ int main(void) {
     UnloadTexture(saucer->sprite);
     UnloadTexture(menu->background);
     UnloadTexture(game->background);
+    UnloadSound(bulletFired);
+    UnloadSound(explosion);
+    UnloadSound(menuScroll);
+    UnloadMusicStream(menuTheme);
+    UnloadMusicStream(gameTheme);
+    UnloadMusicStream(loseTheme);
     CloseWindow();        // Close window and OpenGL context
     //-------------------------------------------------------------------------
 
