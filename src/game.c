@@ -32,7 +32,7 @@ void gameConstructor(struct Game* game) {
     game->backgroundPosX = 0;
     game->backgroundPosY = 0;
     game->backgroundColor = WHITE;
-    game->lives = 100;
+    game->lives = 20;
     game->score = 0;
     game->maxScore = 0;
     game->targetAmount = 0;
@@ -243,7 +243,7 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
         struct Crosshair* crosshair, Sound scroll, Sound fire) { 
     bool clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 
-    if (*inputKey == KEY_W || *inputKey == KEY_UP) {
+    if (*inputKey == KEY_W || *inputKey == KEY_D || *inputKey == KEY_UP) {
         if (menu->key == 1) {
             menu->key = 2;
         } else {
@@ -251,7 +251,7 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
         }
         PlaySound(scroll);
     }
-    if (*inputKey == KEY_S || *inputKey == KEY_DOWN) {
+    if (*inputKey == KEY_S || *inputKey == KEY_A || *inputKey == KEY_DOWN) {
         if (menu->key == 1) {
             menu->key = 2;
         } else {
@@ -260,18 +260,21 @@ void eventMenuScroll(struct Game* game, struct Menu* menu, int *inputKey,
         PlaySound(scroll);
     }
 
-    if (CheckCollisionRecs(menu->playBox, crosshair->recticle)) {
+    if (CheckCollisionRecs(menu->playBox, crosshair->recticle) &&
+            menu->key != 1) {
         menu->key = 1;
         PlaySound(scroll);
     } 
 
-    if (CheckCollisionRecs(menu->exitBox, crosshair->recticle)) {
+    if (CheckCollisionRecs(menu->exitBox, crosshair->recticle) &&
+            menu->key != 2) {
         menu->key = 2;
         PlaySound(scroll);
     }
     
     if (menu->key == 2 && ((*inputKey == KEY_ENTER) || clicked)) {
         game->status = 1;
+        PlaySound(fire);
     }
 
     if (menu->key == 1 && ((*inputKey == KEY_ENTER) || clicked)) {
@@ -334,8 +337,8 @@ void hudConstructor(struct HUD* hud) {
     hud->borderColor = WHITE;
 
     //hud->lives = "L = 100";
-    strcpy(hud->lives, "L = 100");
-    hud->livesPosX = 100;
+    strcpy(hud->lives, "L = 20");
+    hud->livesPosX = 50;
     hud->livesPosY = 600;
     hud->livesSize = 30;
     hud->livesColor = WHITE;
@@ -433,14 +436,16 @@ void updateLivesDisplay(struct HUD* hud, int lives) {
 // ========== SPRITE ==========================================================
 typedef struct Saucer {
     Texture2D sprite;
+    Texture2D deathMark;
     double spritePosX, spritePosY, spriteSpeedModifier, spriteDirectionX,
-           spriteDirectionY;
+           spriteDirectionY, deathMarkPosX, deathMarkPosY;
     Rectangle hitbox;
     Rectangle source;
     Rectangle destination;
     Vector2 origin;
     float rotation;
     Color spriteColor;
+    Color deathMarkColor;
 } Saucer;
 
 
@@ -453,7 +458,7 @@ void spriteConstructor(struct Saucer* saucer) {
     saucer->spriteDirectionX = 1;
     saucer->spriteDirectionY = 1;
     saucer->hitbox = (Rectangle){0, 0, 75, 75};
-    
+
     // DrawTexture
     saucer->spritePosX = rand() % 1280;
     saucer->spritePosY = 460;
@@ -464,6 +469,14 @@ void spriteConstructor(struct Saucer* saucer) {
     saucer->origin = (Vector2){0, 0};
     saucer->rotation = 0;
     saucer->spriteColor = WHITE;
+
+    // death mark
+    saucer->deathMark = LoadTexture("../assets/hitmarker.png");
+    saucer->deathMark.width = 35;
+    saucer->deathMark.height = 35;
+    saucer->deathMarkPosX = saucer->spritePosX + 20;
+    saucer->deathMarkPosY = saucer->spritePosY + 20;
+    saucer->deathMarkColor = RED;
 }
 
 
@@ -511,8 +524,8 @@ void checkSpriteBoundaries(struct Saucer* saucer) {
 
 // Sprite Hitbox
 void updateSpriteHitbox(struct Saucer* saucer) {
-    saucer->hitbox.x = (saucer->spritePosX);
-    saucer->hitbox.y = (saucer->spritePosY);
+    saucer->hitbox.x = saucer->spritePosX;
+    saucer->hitbox.y = saucer->spritePosY;
 }
 
 // Sprite Spawn Point
@@ -542,19 +555,20 @@ void normalizeDirection(struct Saucer* saucer) {
     saucer->spriteDirectionX*=(1.0 / magnitude);
     saucer->spriteDirectionY*=(1.0 / magnitude);
 }
+
+// Sprite Death Mark
+void updateDeathMark(struct Saucer* saucer) {
+    saucer->deathMarkPosX = saucer->spritePosX + 20;
+    saucer->deathMarkPosY = saucer->spritePosY + 20;
+}
 // ========== END OF SPRITE ===================================================
 
 
 
 // ========== TIMER ===========================================================
 typedef struct Timer {
-    float spawnDelay;
-    float xMovementDelay;
-    float yMovementDelay;
-    float despawnDelay;
-    float roundDelay;
-    float scoreDelay;
-    float gameOverDelay;
+    float spawnDelay, xMovementDelay, yMovementDelay, despawnDelay,
+          roundDelay, scoreDelay, gameOverDelay;
     double currentTime;
 } Timer;
 
@@ -608,7 +622,7 @@ void startXMovementDelay(struct Timer* timer) {
 // restart xMovementDelay
 void restartXMovementDelay(struct Timer* timer) {
     if (timer->xMovementDelay <= 0) {
-        timer->xMovementDelay = 2;
+        timer->xMovementDelay = 1;
     }
 } 
 
@@ -622,7 +636,7 @@ void startYMovementDelay(struct Timer* timer) {
 // restart yMovementDelay
 void restartYMovementDelay(struct Timer* timer) {
     if (timer->yMovementDelay <= 0) {
-        timer->yMovementDelay = 2;
+        timer->yMovementDelay = 1;
     }
 }
 
@@ -652,12 +666,12 @@ void reset(struct Game* game, struct Saucer* saucer, struct HUD* hud,
     game->backgroundPosX = 0;
     game->backgroundPosY = 0;
     game->backgroundColor = WHITE;
-    game->lives = 100;
+    game->lives = 20;
     game->score = 0;
     game->targetAmount = 0;
     game->paused = false;
 
-    strcpy(hud->lives, "L = 100");
+    strcpy(hud->lives, "L = 20");
     strcpy(hud->speed, "S = 3");
     strcpy(hud->upgrade, "LEVEL UP UPGRADE IN = 0/10");
     strcpy(hud->score, "000000\nSCORE");
@@ -671,6 +685,7 @@ void reset(struct Game* game, struct Saucer* saucer, struct HUD* hud,
     restartGameOverDelay(timer);
     resetSpriteSpawn(saucer);
     updateSpriteHitbox(saucer);
+    updateDeathMark(saucer);
     saucer->spriteDirectionX = 1;
     saucer->spriteDirectionY = 1;
     crosshair->clickedUFO = false;
@@ -774,7 +789,7 @@ int main(void) {
 
                 // Debug Print Statements
                 //-------------------------------------------------------------
-                
+                //
                 //-------------------------------------------------------------
                 
                 if (game->lives <= 0) {
@@ -803,6 +818,8 @@ int main(void) {
                     crosshair->clickedUFO = true;
                     PlaySound(bulletFired);
                     PlaySound(explosion);
+                    DrawTexture(saucer->deathMark, saucer->deathMarkPosX,
+                        saucer->deathMarkPosY, saucer->deathMarkColor);
                 }
 
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
@@ -833,6 +850,7 @@ int main(void) {
                     restartYMovementDelay(timer);
                     resetSpriteSpawn(saucer);
                     updateSpriteHitbox(saucer);
+                    updateDeathMark(saucer);
                     saucer->spriteDirectionX = 1;
                     saucer->spriteDirectionY = 1;
                     crosshair->clickedUFO = false;
@@ -843,7 +861,7 @@ int main(void) {
                     game->lives+=10;
                     updateLivesDisplay(hud, game->lives);
                     updateUpgrades(hud, game->targetAmount);
-                    saucer->spriteSpeedModifier+=0.1;
+                    saucer->spriteSpeedModifier+=1.0;
                     updateSpeedDisplay(hud, saucer->spriteSpeedModifier);
                 }
 
@@ -867,6 +885,7 @@ int main(void) {
                         startYMovementDelay(timer);
                         
                         updateSpriteHitbox(saucer);
+                        updateDeathMark(saucer);
                         checkSpriteBoundaries(saucer);
                         normalizeDirection(saucer);
                         move(saucer, saucer->spriteSpeedModifier *
